@@ -1,0 +1,40 @@
+[*]
+[*] GTKWave Analyzer v3.3.90 (w)1999-2018 BSI
+[*] Sat Aug 29 22:34:20 2020
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/tom/projects/sound_camera/pdm_test/tb/spdif/waves.gtkw"
+[timestart] 103942
+[size] 3069 1271
+[pos] -1 -1
+*-9.214449 54673 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 437
+[signals_width] 397
+[sst_expanded] 1
+[sst_vpaned_height] 428
+@28
+clk
+reset
+@24
+subframe_cntr_value
+frame_cntr_value[7:0]
+@200
+-
+@24
+audio_samples_0[15:0]
+@22
+audio_samples_1[15:0]
+@28
+audio_samples_rdy
+@200
+-
+@28
+parity
+@24
+time_slot_cntr_value[5:0]
+@200
+-
+@28
+io_spdif
+[pattern_trace] 1
+[pattern_trace] 0
