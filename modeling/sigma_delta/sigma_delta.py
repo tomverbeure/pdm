@@ -15,15 +15,14 @@ if platform.system() == "Darwin":
 else:
     BLOG_PATH = "/home/tom/projects/tomverbeure.github.io/assets/pdm/sigma_delta/"
 
-plot_quantization_noise                         = True
-plot_sinewave_to_pdm                            = True
-plot_sinewave_pdm_psd                           = True
-plot_sinewave_to_pdm_different_orders           = True
-plot_sinewave_pdm_psd_different_orders          = True
-plot_sinewave_to_pdm_different_osr              = True
-plot_sinewave_pdm_psd_different_osr             = True
+plot_quantization_noise                         = False
+plot_sinewave_to_pdm                            = False
+plot_sinewave_pdm_psd                           = False
+plot_sinewave_to_pdm_different_orders           = False
+plot_sinewave_pdm_psd_different_orders          = False
+plot_sinewave_to_pdm_different_osr              = False
+plot_sinewave_pdm_psd_different_osr             = False
 plot_noise_slope_different_orders               = True
-plot_sigma_delta_decimation_without_filtering   = True
 
 class SignalInfo:
 
@@ -106,7 +105,7 @@ def sigma_delta_noise_slopes():
     plt.plot(f, dbp(Sqq * NBW), 'm', linewidth=2, label='PSD 4rd Order')
 
     #plt.plot([f[signalInfo.fB], f[signalInfo.fB]], [dbv(np.amin(np.abs(spec))), dbv(1.0)], 'g-.', linewidth=1.0)
-    plt.plot([f[N//OSR], f[N//OSR]], [-120, 0], 'g-.', linewidth=1.0)
+    plt.plot([f[N//OSR//2], f[N//OSR//2]], [-120, 0], 'g-.', linewidth=1.0)
 
     plt.legend(loc=4)
 
