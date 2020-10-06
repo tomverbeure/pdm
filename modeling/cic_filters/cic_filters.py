@@ -10,9 +10,9 @@ from filter_lib import *
 
 import platform
 if platform.system() == "Darwin":
-    BLOG_PATH = "/Users/tom/projects/tomverbeure.github.io/assets/pdm/"
+    BLOG_PATH = "/Users/tom/projects/tomverbeure.github.io/assets/pdm/cic_filters/"
 else:
-    BLOG_PATH = "/home/tom/projects/tomverbeure.github.io/assets/pdm/"
+    BLOG_PATH = "/home/tom/projects/tomverbeure.github.io/assets/pdm/cic_filters/"
 
 def mov_avg_filter_psd(length = 64, order = 1, osr = None, plotStop = None, plotPass = None, plotLog = True):
 
@@ -185,7 +185,7 @@ if True:
 #============================================================
 
 
-if True:
+if False:
     plt.figure(figsize=(10,4))
 
     plt.subplot(111)
