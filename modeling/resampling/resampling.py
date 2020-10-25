@@ -6,6 +6,9 @@ from matplotlib import pyplot as plt
 from scipy import signal
 from filter_lib import *
 
+plot_resampling_no_filtering = True
+plot_resampling_with_filtering = True
+
 import platform
 if platform.system() == "Darwin":
     BLOG_PATH = "/Users/tom/projects/tomverbeure.github.io/assets/pdm/resampling/"
@@ -18,15 +21,15 @@ def input_signal():
     x = np.linspace(0., 1., N)
 
     freq1 = 500
-    freq2 = 350
+    freq2 = 3000
     freq3 = 630
 
     y1 = 1.0 * np.sin(2 * np.pi * freq1 * x)
-    y2 = 0.2 * np.sin(2 * np.pi * freq2 * x)
+    y2 = 0.5 * np.sin(2 * np.pi * freq2 * x)
     y3 = 2.0 * np.sin(2 * np.pi * freq3 * x)
 
     np.random.seed(0)
-    y = (y1 + np.random.randn(N) * 0.01)
+    y = (y1 + y2 + np.random.randn(N) * 0.01)
 
     return y
 
@@ -58,8 +61,8 @@ def plot_fft_sig(sig):
     plt.plot(N * x[:int(N/2. + 1)], dB20(np.abs(spec[:int(N/2. + 1)])),'b', label='Simulation')
 
 
-if True:
-    plt.figure(figsize=(10,10))
+if plot_resampling_no_filtering:
+    plt.figure(figsize=(10,15))
 
     L = 10
     M = 3
@@ -74,7 +77,6 @@ if True:
 
     # Original signal - freq
     plt.subplot(512)
-    plt.title('Resampling')
     plot_fft_sig(sig_in)
 
     # Interpolate
@@ -95,7 +97,84 @@ if True:
 
     plt.tight_layout()
 
-    plt_name = "resampling.svg"
+    plt_name = "resampling_no_filtering.svg"
+    plt.savefig(plt_name)
+    #plt.savefig(BLOG_PATH + plt_name)
+
+if plot_resampling_with_filtering:
+    plt.figure(figsize=(10,10))
+
+    Fs = 10000
+    L = 10
+    M = 3
+
+    # Original signal
+    sig_in = input_signal()
+
+    # Original signal - time
+    plt.subplot(711)
+    plt.title('Resampling')
+    plt.plot(sig_in[0:100])
+
+    # Original signal - freq
+    plt.subplot(712)
+    plot_fft_sig(sig_in)
+
+    # Interpolate
+    sig_interpol = insert_zeros(sig_in, L)
+
+    plt.subplot(713)
+    plot_fft_sig(sig_interpol)
+
+    # Interpolation filter all frequencies above 1/L/2
+
+    Fpb = Fs/2 * 0.7
+    Fsb = Fs/2
+    Apb = 0.1
+    Asb = 80
+    N = 256
+
+    print("Interpolation filter passband: ", Fpb)
+
+    (h, w, H, Rpb, Rsb, Hpb_min, Hpb_max, Hsb_max) = fir_calc_filter(Fs * L, Fpb, Fsb, Apb, Asb, N)
+
+    sig_interpol_filt = np.convolve(sig_interpol, h)
+    #sig_interpol_filt = sig_interpol
+
+    plt.subplot(714)
+    plot_fft_sig(sig_interpol_filt)
+
+    # Decimation filter all frequencies above L/M/2
+
+    Fpb = Fs*L/M/2 * 0.7
+    Fsb = Fs*L/M/2
+    Apb = 0.1
+    Asb = 80
+    N = 100
+
+    print("Decimation filter passband: ", Fpb)
+
+    (h, w, H, Rpb, Rsb, Hpb_min, Hpb_max, Hsb_max) = fir_calc_filter(Fs * L, Fpb, Fsb, Apb, Asb, N)
+
+    #sig_interpol_filt_filt = np.convolve(sig_interpol_filt, h)
+    sig_interpol_filt_filt = sig_interpol_filt
+
+    plt.subplot(715)
+    plot_fft_sig(sig_interpol_filt_filt)
+
+    # Decimate
+    sig_decimate = decimate(sig_interpol_filt_filt, M)
+
+    plt.subplot(716)
+    plot_fft_sig(sig_decimate)
+
+    # output - time
+    plt.subplot(717)
+    plt.plot(sig_decimate[0:int(100*L/M)])
+
+    plt.tight_layout()
+
+    plt_name = "resampling_with_filtering.svg"
     plt.savefig(plt_name)
     #plt.savefig(BLOG_PATH + plt_name)
 
