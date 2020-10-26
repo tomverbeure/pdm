@@ -107,6 +107,7 @@ if plot_resampling_with_filtering:
     Fs = 10000
     L = 10
     M = 3
+    taps = 256
 
     # Original signal
     sig_in = input_signal()
@@ -121,7 +122,7 @@ if plot_resampling_with_filtering:
     plot_fft_sig(sig_in)
 
     # Interpolate
-    sig_interpol = insert_zeros(sig_in, L)
+    sig_interpol = insert_zeros(sig_in, L) * (L-1)
 
     plt.subplot(713)
     plot_fft_sig(sig_interpol)
@@ -132,49 +133,34 @@ if plot_resampling_with_filtering:
     Fsb = Fs/2
     Apb = 0.1
     Asb = 80
-    N = 256
+    N = taps
 
     print("Interpolation filter passband: ", Fpb)
 
     (h, w, H, Rpb, Rsb, Hpb_min, Hpb_max, Hsb_max) = fir_calc_filter(Fs * L, Fpb, Fsb, Apb, Asb, N)
 
-    sig_interpol_filt = np.convolve(sig_interpol, h)
+    sig_interpol_filt = np.convolve(sig_interpol, h)[N//2:]
     #sig_interpol_filt = sig_interpol
 
     plt.subplot(714)
     plot_fft_sig(sig_interpol_filt)
 
-    # Decimation filter all frequencies above L/M/2
-
-    Fpb = Fs*L/M/2 * 0.7
-    Fsb = Fs*L/M/2
-    Apb = 0.1
-    Asb = 80
-    N = 100
-
-    print("Decimation filter passband: ", Fpb)
-
-    (h, w, H, Rpb, Rsb, Hpb_min, Hpb_max, Hsb_max) = fir_calc_filter(Fs * L, Fpb, Fsb, Apb, Asb, N)
-
-    #sig_interpol_filt_filt = np.convolve(sig_interpol_filt, h)
-    sig_interpol_filt_filt = sig_interpol_filt
+    # Decimate
+    sig_decimate = decimate(sig_interpol_filt, M)
 
     plt.subplot(715)
-    plot_fft_sig(sig_interpol_filt_filt)
-
-    # Decimate
-    sig_decimate = decimate(sig_interpol_filt_filt, M)
-
-    plt.subplot(716)
     plot_fft_sig(sig_decimate)
 
     # output - time
-    plt.subplot(717)
+    plt.subplot(716)
     plt.plot(sig_decimate[0:int(100*L/M)])
+
+    print("Polyphase number of taps: ", taps/L/M)
 
     plt.tight_layout()
 
     plt_name = "resampling_with_filtering.svg"
     plt.savefig(plt_name)
     #plt.savefig(BLOG_PATH + plt_name)
+
 
