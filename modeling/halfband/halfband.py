@@ -9,7 +9,8 @@ from filter_lib import *
 
 save_blog = False
 
-plot_half_band_example          = True
+plot_half_band_example          = False
+plot_half_band_standalone       = True
 
 import platform
 if platform.system() == "Darwin":
@@ -58,3 +59,4 @@ if plot_half_band_example:
     plt.savefig("half_band_example.svg")
     if save_blog: plt.savefig(BLOG_PATH + "half_band_example.svg")
 
+if plot_half_band_standalone:
