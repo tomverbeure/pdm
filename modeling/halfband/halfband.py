@@ -79,7 +79,7 @@ if plot_6x_decimation_stand_alone:
 
     N = fir_find_optimal_N(f_s, f_pb, f_sb, a_pb, a_sb)
 
-    print("Muls per second: %d * %d = %d" % (f_s, N+1, f_s * (N+1)))
+    print("Muls per second: %d * %d = %d" % (f_s/6, N+1, f_s/6 * (N+1)))
 
 #============================================================
 # 2-stage decimation
@@ -95,15 +95,15 @@ if plot_2stage_decimation:
 
     hb_N = half_band_find_optimal_N(f_s, f_sb, a_pb/2, a_sb)
     (hb_h, hb_w, hb_H, hb_Rpb, hb_Rsb, hb_Hpb_min, hb_Hpb_max, hb_Hsb_max) = half_band_calc_filter(f_s, f_sb, hb_N)
-    hb_muls = f_s * (hb_N/2+1)
+    hb_muls = f_s/2 * (hb_N/2+1)
 
     print(dB20(hb_Rpb))
 
     fir_N = fir_find_optimal_N(f_s/2, f_pb, f_sb, a_pb - dB20(hb_Rpb), a_sb)
-    fir_muls = f_s/2 * (fir_N+1)
+    fir_muls = f_s/6 * (fir_N+1)
 
-    print("Half band muls per second: %d * (%d/2+1) = %d" % (f_s, hb_N, hb_muls))
-    print("FIR muls per second: %d * %d = %d" % (f_s/2, fir_N+1, fir_muls))
+    print("Half band muls per second: %d * (%d/2+1) = %d" % (f_s/2, hb_N, hb_muls))
+    print("FIR muls per second: %d * %d = %d" % (f_s/6, fir_N+1, fir_muls))
     print("Total muls: %d" % (hb_muls + fir_muls))
 
 
