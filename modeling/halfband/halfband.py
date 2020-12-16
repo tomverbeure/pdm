@@ -10,13 +10,19 @@ from filter_lib import *
 save_blog = False
 
 plot_half_band_example          = False
-plot_half_band_standalone       = True
+plot_6x_decimation_stand_alone  = True
+plot_2stage_decimation          = True
 
 import platform
 if platform.system() == "Darwin":
     BLOG_PATH = "/Users/tom/projects/tomverbeure.github.io/assets/pdm/halfband/"
 else:
     BLOG_PATH = "/home/tom/projects/tomverbeure.github.io/assets/pdm/halfband/"
+
+def dB20(array):
+    with np.errstate(divide='ignore'):
+        return 20 * np.log10(array)
+
 
 #============================================================
 # Half Band Filter
@@ -59,4 +65,47 @@ if plot_half_band_example:
     plt.savefig("half_band_example.svg")
     if save_blog: plt.savefig(BLOG_PATH + "half_band_example.svg")
 
-if plot_half_band_standalone:
+#============================================================
+# Single stage 6x decimation
+#============================================================
+
+if plot_6x_decimation_stand_alone:
+
+    f_s     = 288000
+    f_pb    = 10000
+    f_sb    = 24000
+    a_pb    = 0.1
+    a_sb    = 90
+
+    N = fir_find_optimal_N(f_s, f_pb, f_sb, a_pb, a_sb)
+
+    print("Muls per second: %d * %d = %d" % (f_s, N+1, f_s * (N+1)))
+
+#============================================================
+# 2-stage decimation
+#============================================================
+
+if plot_2stage_decimation:
+
+    f_s     = 288000
+    f_pb    = 10000
+    f_sb    = 24000
+    a_pb    = 0.1
+    a_sb    = 90
+
+    hb_N = half_band_find_optimal_N(f_s, f_sb, a_pb/2, a_sb)
+    (hb_h, hb_w, hb_H, hb_Rpb, hb_Rsb, hb_Hpb_min, hb_Hpb_max, hb_Hsb_max) = half_band_calc_filter(f_s, f_sb, hb_N)
+    hb_muls = f_s * (hb_N/2+1)
+
+    print(dB20(hb_Rpb))
+
+    fir_N = fir_find_optimal_N(f_s/2, f_pb, f_sb, a_pb - dB20(hb_Rpb), a_sb)
+    fir_muls = f_s/2 * (fir_N+1)
+
+    print("Half band muls per second: %d * (%d/2+1) = %d" % (f_s, hb_N, hb_muls))
+    print("FIR muls per second: %d * %d = %d" % (f_s/2, fir_N+1, fir_muls))
+    print("Total muls: %d" % (hb_muls + fir_muls))
+
+
+
+
