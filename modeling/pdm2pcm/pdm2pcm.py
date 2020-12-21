@@ -12,11 +12,11 @@ plot_cic_decimation_passband_droop  = False
 plot_cic_stages_passband_droop      = False
 passband_droop_table                = False
 stopband_attenuation_table          = False
-passband_stopband_attenuation_table = False
+passband_stopband_attenuation_table = True
 number_of_muls_table                = False
-plot_pdm2pcm_filters                = True
+plot_pdm2pcm_filters                = False
 
-save_blog = False
+save_blog = True
 
 import platform
 if platform.system() == "Darwin":
@@ -52,6 +52,9 @@ a_pb    = 0.1
 a_sb    = 89
 
 
+cic_differential_delay  = 1
+
+
 if plot_cic_decimation_passband_droop:
     #============================================================
     # CIC Passband droop vs Decimation Ratio
@@ -69,7 +72,7 @@ if plot_cic_decimation_passband_droop:
     plt.ylabel("Attenuation (dB)")
     plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
-    for decim in [2, 4, 6, 8, 12, 16, 24, 48]:
+    for decim in [2, 3, 4, 6, 8, 12, 16, 24, 48]:
 
         h_cic = cic_filter(decim, cic_order)
 
@@ -96,7 +99,7 @@ if plot_cic_decimation_passband_droop:
     plt.ylabel("Attenuation (dB)")
     plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
 
-    for decim in [2, 4, 6, 8, 12, 16, 24, 48]:
+    for decim in [2, 3, 4, 6, 8, 12, 16, 24, 48]:
         print(decim)
         mov_avg_length  = decim * cic_differential_delay
 
@@ -167,7 +170,7 @@ if passband_droop_table:
 
     s += "</tr>\n"
 
-    for decim in [2, 4, 6, 8, 12, 16, 24, 48]:
+    for decim in [2, 3, 4, 6, 8, 12, 16, 24, 48]:
         s += "<tr>\n"
         s += "    <th>%d</th>\n" % decim
 
@@ -183,9 +186,9 @@ if passband_droop_table:
             pb_ok = abs(pb_attn) <= a_pb/2
 
             if pb_ok:
-                s += "    <td style=\"background-color:#a0e0a0\">%.3f</td>\n" % pb_attn
+                s += "    <td style=\"background-color:#a0e0a0\">%.4f</td>\n" % pb_attn
             else:
-                s += "    <td style=\"background-color:#e0a0a0\">%.3f</td>\n" % pb_attn
+                s += "    <td style=\"background-color:#e0a0a0\">%.4f</td>\n" % pb_attn
 
         s += "</tr>\n"
 
@@ -209,7 +212,7 @@ if stopband_attenuation_table:
 
     s += "</tr>\n"
 
-    for decim in [2, 4, 6, 8, 12, 16, 24, 48]:
+    for decim in [2, 3, 4, 6, 8, 12, 16, 24, 48]:
         s += "<tr>\n"
         s += "    <th>%d</th>\n" % decim
 
@@ -251,7 +254,7 @@ if passband_stopband_attenuation_table:
 
     s += "</tr>\n"
 
-    for decim in [2, 4, 6, 8, 12, 16, 24, 48]:
+    for decim in [2, 3, 4, 6, 8, 12, 16, 24, 48]:
         s += "<tr>\n"
         s += "    <th>%d</th>\n" % decim
 
@@ -268,9 +271,9 @@ if passband_stopband_attenuation_table:
             sb_ok = abs(sb_attn) >= a_sb
 
             if pb_ok and sb_ok:
-                s += "    <td style=\"background-color:#a0e0a0\">%.3f<br/>%.1f</td>\n" % (pb_attn, sb_attn)
+                s += "    <td style=\"background-color:#a0e0a0\">%.4f<br/>%.1f</td>\n" % (pb_attn, sb_attn)
             else:
-                s += "    <td style=\"background-color:#e0a0a0\">%.3f<br/>%.1f</td>\n" % (pb_attn, sb_attn)
+                s += "    <td style=\"background-color:#e0a0a0\">%.4f<br/>%.1f</td>\n" % (pb_attn, sb_attn)
 
         s += "</tr>\n"
 
