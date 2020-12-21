@@ -13,9 +13,10 @@ plot_cic_stages_passband_droop      = False
 passband_droop_table                = False
 stopband_attenuation_table          = False
 passband_stopband_attenuation_table = False
-number_of_muls_table                = True
+number_of_muls_table                = False
+plot_pdm2pcm_filters                = True
 
-save_blog = False
+save_blog = True
 
 import platform
 if platform.system() == "Darwin":
@@ -416,4 +417,146 @@ if number_of_muls_table:
     s += "</table>\n"
 
     print(s)
+
+if plot_pdm2pcm_filters:
+    #============================================================
+    # magnitude frequency plots for all the filter stages of the final architecture
+    #============================================================
+    plt.figure(figsize=(10, 12))
+
+
+    #============================================================
+    # CIC Filter
+    #============================================================
+    cic_decim       = 12
+    cic_order       = 4
+
+
+    h_cic = cic_filter(cic_decim, cic_order)
+    h_cic_stats = FilterStats(h_cic, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = (16384//cic_decim//2)*cic_decim*2)
+
+    plt.subplot(421)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-130, 5])
+    plt.gca().set_title("CIC Filter - Frequency Reponse")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Attenuation (dB)")
+    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.plot(h_cic_stats.freqs[h_cic_stats.x_mask] * f_pdm, h_cic_stats.Hdb)
+    plt.plot([f_pb, f_pb], [-130, 5], "--", linewidth=1.0, label="Pass band")
+    plt.plot([f_sb, f_sb], [-130, 5], "--", linewidth=1.0, label="Stop band")
+    plt.plot([f_out/2, f_out/2], [-130, 5], "--", linewidth=1.0, label="BW out")
+    plt.legend(loc=1)
+
+    plt.subplot(422)
+    plt.grid(True)
+    plt.gca().set_title("Impulse Reponse")
+    plt.gca().set_xlim([0, len(h_cic)-1])
+    plt.stem(h_cic)
+
+    cic_pb_attn = h_cic_stats.attn_at(f_pb)
+    cic_sb_attn = h_cic_stats.attn_at(2*(f_pdm/2/cic_decim) - f_sb)
+
+    decim_remain    = (f_pdm//cic_decim) // f_out
+    f_s_remain      = f_pdm//cic_decim
+    pb_attn_remain  = a_pb - abs(cic_pb_attn)
+
+    #============================================================
+    # HB1 Filter
+    #============================================================
+
+    hb1_N = half_band_find_optimal_N(f_s_remain, f_sb, pb_attn_remain, a_sb, verbose = False)
+    (hb1_h, hb1_w, hb1_H, hb1_Rpb, hb1_Rsb, hb1_Hpb_min, hb1_Hpb_max, hb1_Hsb_max) = half_band_calc_filter(f_s_remain, f_sb, hb1_N)
+
+    plt.subplot(423)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_s_remain/2])
+    plt.gca().set_ylim([-130, 5])
+    plt.gca().set_title("Half-band Filter 1 - Frequency Response")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Attenuation (dB)")
+    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.plot(hb1_w/np.pi/2*f_s_remain, dB20(np.abs(hb1_H)))
+    plt.plot([f_pb, f_pb], [-130, 5], "--", linewidth=1.0, label="Pass band")
+    plt.plot([f_sb, f_sb], [-130, 5], "--", linewidth=1.0, label="Stop band")
+    plt.plot([f_out/2, f_out/2], [-130, 5], "--", linewidth=1.0, label="BW out")
+    plt.legend(loc=1)
+
+    plt.subplot(424)
+    plt.grid(True)
+    plt.gca().set_title("Impulse Reponse - %d Taps" % len(hb1_h))
+    plt.gca().set_xlim([0, len(hb1_h)-1])
+    plt.stem(hb1_h)
+
+    decim_remain //= 2
+    f_s_remain //= 2
+    pb_attn_remain -= abs(dB20(hb1_Rpb))
+
+    #============================================================
+    # HB2 Filter
+    #============================================================
+
+    hb2_N = half_band_find_optimal_N(f_s_remain, f_sb, pb_attn_remain, a_sb, verbose = False)
+    (hb2_h, hb2_w, hb2_H, hb2_Rpb, hb2_Rsb, hb2_Hpb_min, hb2_Hpb_max, hb2_Hsb_max) = half_band_calc_filter(f_s_remain, f_sb, hb2_N)
+
+    plt.subplot(425)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_s_remain])
+    plt.gca().set_ylim([-130, 5])
+    plt.gca().set_title("Half-band Filter 2 - Frequency Response")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Attenuation (dB)")
+    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.plot(hb2_w/np.pi/2*f_s_remain, dB20(np.abs(hb2_H)))
+    plt.plot([f_pb, f_pb], [-130, 5], "--", linewidth=1.0, label="Pass band")
+    plt.plot([f_sb, f_sb], [-130, 5], "--", linewidth=1.0, label="Stop band")
+    plt.plot([f_out/2, f_out/2], [-130, 5], "--", linewidth=1.0, label="BW out")
+    plt.plot([f_s_remain/2, f_s_remain/2], [-130, 5], "--", linewidth=1.0, label="BW in")
+    plt.legend(loc=1)
+
+    plt.subplot(426)
+    plt.grid(True)
+    plt.gca().set_title("Impulse Reponse - %d Taps" % len(hb2_h))
+    plt.gca().set_xlim([0, len(hb2_h)-1])
+    plt.stem(hb2_h)
+
+    decim_remain //= 2
+    f_s_remain //= 2
+    pb_attn_remain -= abs(dB20(hb2_Rpb))
+
+    #============================================================
+    # FIR Filter
+    #============================================================
+
+    fir_N = fir_find_optimal_N(f_s_remain, f_pb, f_sb, pb_attn_remain, a_sb, verbose = False)
+    (fir_h, fir_w, fir_H, fir_Rpb, fir_Rsb, fir_Hpb_min, fir_Hpb_max, fir_Hsb_max) = fir_calc_filter(f_s_remain, f_pb, f_sb, pb_attn_remain, a_sb, fir_N)
+
+    plt.subplot(427)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_s_remain*2])
+    plt.gca().set_ylim([-130, 5])
+    plt.gca().set_title("Final FIR Filter - Frequency Response")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Attenuation (dB)")
+    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.plot(fir_w/np.pi/2*f_s_remain, dB20(np.abs(fir_H)))
+    plt.plot([f_pb, f_pb], [-130, 5], "--", linewidth=1.0, label="Pass band")
+    plt.plot([f_sb, f_sb], [-130, 5], "--", linewidth=1.0, label="Stop band")
+    plt.plot([f_out/2, f_out/2], [-130, 5], "--", linewidth=1.0, label="BW out")
+    plt.plot([f_s_remain/2, f_s_remain/2], [-130, 5], "--", linewidth=1.0, label="BW in")
+    plt.legend(loc=1)
+
+    plt.subplot(428)
+    plt.grid(True)
+    plt.gca().set_title("Impulse Reponse - %d Taps" % len(fir_h))
+    plt.gca().set_xlim([0, len(fir_h)-1])
+    plt.stem(fir_h)
+
+    plt.tight_layout()
+    plt.savefig("pdm2pcm_filters.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "pdm2pcm_filters.svg")
+
+
+
 
