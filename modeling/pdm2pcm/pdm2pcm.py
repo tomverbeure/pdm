@@ -16,7 +16,7 @@ passband_stopband_attenuation_table = False
 number_of_muls_table                = False
 plot_pdm2pcm_filters                = True
 
-save_blog = True
+save_blog = False
 
 import platform
 if platform.system() == "Darwin":
