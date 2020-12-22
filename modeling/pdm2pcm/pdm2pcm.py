@@ -4,17 +4,18 @@ import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
+from matplotlib.ticker import EngFormatter
 
 from scipy import signal
 from filter_lib import *
 
-plot_cic_decimation_passband_droop  = False
-plot_cic_stages_passband_droop      = False
+plot_cic_decimation_passband_droop  = True
+plot_cic_stages_passband_droop      = True
 passband_droop_table                = False
 stopband_attenuation_table          = False
-passband_stopband_attenuation_table = True
+passband_stopband_attenuation_table = False
 number_of_muls_table                = False
-plot_pdm2pcm_filters                = False
+plot_pdm2pcm_filters                = True
 
 save_blog = True
 
@@ -68,9 +69,9 @@ if plot_cic_decimation_passband_droop:
     plt.gca().set_xlim([0.0, f_pdm/2])
     plt.gca().set_ylim([-130, 5])
     plt.title("%d CIC Stages - All Decimation Ratios - Input Range" % cic_order)
-    plt.xlabel("Frequency (Hz)")
+    plt.xlabel("Frequency")
     plt.ylabel("Attenuation (dB)")
-    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
 
     for decim in [2, 3, 4, 6, 8, 12, 16, 24, 48]:
 
@@ -95,9 +96,9 @@ if plot_cic_decimation_passband_droop:
     plt.grid(True)
     plt.gca().set_xlim([0.0, f_out/2])
     plt.gca().set_ylim([-0.5, 0.5])
-    plt.xlabel("Frequency (Hz)")
+    plt.xlabel("Frequency")
     plt.ylabel("Attenuation (dB)")
-    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
 
     for decim in [2, 3, 4, 6, 8, 12, 16, 24, 48]:
         print(decim)
@@ -134,9 +135,9 @@ if plot_cic_stages_passband_droop:
     plt.grid(True)
     plt.gca().set_xlim([0.0, f_out/2])
     plt.gca().set_ylim([-0.5, 0.5])
-    plt.xlabel("Frequency (Hz)")
+    plt.xlabel("Frequency")
     plt.ylabel("Attenuation (dB)")
-    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
 
     for cic_order in range(1, 7):
         print(cic_order)
@@ -443,9 +444,9 @@ if plot_pdm2pcm_filters:
     plt.gca().set_xlim([0.0, f_pdm/2])
     plt.gca().set_ylim([-130, 5])
     plt.gca().set_title("CIC Filter - Frequency Reponse")
-    plt.xlabel("Frequency (Hz)")
+    plt.xlabel("Frequency")
     plt.ylabel("Attenuation (dB)")
-    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
     plt.plot(h_cic_stats.freqs[h_cic_stats.x_mask] * f_pdm, h_cic_stats.Hdb)
     plt.plot([f_pb, f_pb], [-130, 5], "--", linewidth=1.0, label="Pass band")
     plt.plot([f_sb, f_sb], [-130, 5], "--", linewidth=1.0, label="Stop band")
@@ -477,9 +478,9 @@ if plot_pdm2pcm_filters:
     plt.gca().set_xlim([0.0, f_s_remain/2])
     plt.gca().set_ylim([-130, 5])
     plt.gca().set_title("Half-band Filter 1 - Frequency Response")
-    plt.xlabel("Frequency (Hz)")
+    plt.xlabel("Frequency")
     plt.ylabel("Attenuation (dB)")
-    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
     plt.plot(hb1_w/np.pi/2*f_s_remain, dB20(np.abs(hb1_H)))
     plt.plot([f_pb, f_pb], [-130, 5], "--", linewidth=1.0, label="Pass band")
     plt.plot([f_sb, f_sb], [-130, 5], "--", linewidth=1.0, label="Stop band")
@@ -508,9 +509,9 @@ if plot_pdm2pcm_filters:
     plt.gca().set_xlim([0.0, f_s_remain])
     plt.gca().set_ylim([-130, 5])
     plt.gca().set_title("Half-band Filter 2 - Frequency Response")
-    plt.xlabel("Frequency (Hz)")
+    plt.xlabel("Frequency")
     plt.ylabel("Attenuation (dB)")
-    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
     plt.plot(hb2_w/np.pi/2*f_s_remain, dB20(np.abs(hb2_H)))
     plt.plot([f_pb, f_pb], [-130, 5], "--", linewidth=1.0, label="Pass band")
     plt.plot([f_sb, f_sb], [-130, 5], "--", linewidth=1.0, label="Stop band")
@@ -540,9 +541,9 @@ if plot_pdm2pcm_filters:
     plt.gca().set_xlim([0.0, f_s_remain*2])
     plt.gca().set_ylim([-130, 5])
     plt.gca().set_title("Final FIR Filter - Frequency Response")
-    plt.xlabel("Frequency (Hz)")
+    plt.xlabel("Frequency")
     plt.ylabel("Attenuation (dB)")
-    plt.gca().get_xaxis().set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
     plt.plot(fir_w/np.pi/2*f_s_remain, dB20(np.abs(fir_H)))
     plt.plot([f_pb, f_pb], [-130, 5], "--", linewidth=1.0, label="Pass band")
     plt.plot([f_sb, f_sb], [-130, 5], "--", linewidth=1.0, label="Stop band")
