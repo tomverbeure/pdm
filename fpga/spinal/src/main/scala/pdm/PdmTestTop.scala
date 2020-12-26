@@ -1,6 +1,8 @@
 
 package pdm
 
+import scala.collection.mutable.ArrayBuffer
+
 import spinal.core._
 import spinal.lib._
 import spinal.lib.io._
@@ -216,6 +218,31 @@ class PdmTestTop() extends Component
         val u_pdm_filter = new PdmFilter()
         u_pdm_filter.io.pdm_dat     <> io.pdm_dat
 
+    }
+
+    //============================================================
+    // FirEngine
+    //============================================================
+
+
+    val fir = new ClockingArea(clkCpuDomain) {
+
+        val firs = ArrayBuffer[FirFilterInfo]()
+
+        firs += FirFilterInfo("HB1",    0,  63, true,  Array[Int](1,2,3,4,5,6,7,8,9)) 
+        firs += FirFilterInfo("HB2",   64, 127, true,  Array[Int](1,2,3,4,5)) 
+        firs += FirFilterInfo("FIR",  128, 192, false, Array[Int](1,2,3)) 
+
+        val conf = FirEngineConfig(
+            firs.toArray, 
+            16,
+            18
+          )
+
+        val u_fir_engine = new FirEngine(conf)
+        u_fir_engine.io.data_in.valid     := False
+        u_fir_engine.io.data_in.payload   := 0
+        u_fir_engine.io.data_out.ready    := True
     }
 
     //============================================================
