@@ -195,13 +195,13 @@ class DebugPlugin(val debugClockDomain : ClockDomain, hardwareBreakpointCount : 
         }
       }
 
+      val allowEBreak = if(!pipeline.serviceExist(classOf[PrivilegeService])) True else pipeline.service(classOf[PrivilegeService]).isMachine()
 
-      decode.insert(DO_EBREAK) := !haltIt && (decode.input(IS_EBREAK) || hardwareBreakpoints.map(hb => hb.valid && hb.pc === (decode.input(PC) >> 1)).foldLeft(False)(_ || _))
+      decode.insert(DO_EBREAK) := !haltIt && (decode.input(IS_EBREAK) || hardwareBreakpoints.map(hb => hb.valid && hb.pc === (decode.input(PC) >> 1)).foldLeft(False)(_ || _)) && allowEBreak
       when(execute.arbitration.isValid && execute.input(DO_EBREAK)){
         execute.arbitration.haltByOther := True
         busReadDataReg := execute.input(PC).asBits
         when(stagesFromExecute.tail.map(_.arbitration.isValid).orR === False){
-          iBusFetcher.flushIt()
           iBusFetcher.haltIt()
           execute.arbitration.flushIt   := True
           execute.arbitration.flushNext := True
@@ -224,7 +224,7 @@ class DebugPlugin(val debugClockDomain : ClockDomain, hardwareBreakpointCount : 
       //Avoid having two C instruction executed in a single step
       if(pipeline(RVC_GEN)){
         val cleanStep = RegNext(stepIt && decode.arbitration.isFiring) init(False)
-        decode.arbitration.removeIt setWhen(cleanStep)
+        execute.arbitration.flushNext setWhen(cleanStep)
       }
 
       io.resetOut := RegNext(resetIt)

@@ -42,11 +42,12 @@ class PdmTestTop() extends Component
     val clk_spdif     = Bool
 
     val u_pll = new pll()
-    u_pll.inclk0          <> io.osc_clk_in
-    u_pll.c0              <> clk_pdm    
-    u_pll.c1              <> clk_cpu    
-    u_pll.c2              <> clk_calc    
-    u_pll.c3              <> clk_spdif    
+    u_pll.io.inclk0          <> io.osc_clk_in
+    u_pll.io.c0              <> clk_pdm    
+    u_pll.io.c1              <> clk_cpu    
+    u_pll.io.c2              <> clk_calc    
+    u_pll.io.c3              <> clk_spdif    
+
 
     //============================================================
     // Create clk pdm 

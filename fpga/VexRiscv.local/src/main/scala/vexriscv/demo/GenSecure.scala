@@ -1,27 +1,20 @@
 package vexriscv.demo
 
-import spinal.core._
-import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
 import vexriscv.plugin._
-import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
+import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
+import vexriscv.{plugin, VexRiscv, VexRiscvConfig}
+import spinal.core._
 
-/**
- * Created by spinalvm on 15.06.17.
- */
-object GenFullNoMmuMaxPerf extends App{
+object GenSecure extends App {
   def cpu() = new VexRiscv(
     config = VexRiscvConfig(
       plugins = List(
-        new PcManagerSimplePlugin(
-          resetVector = 0x80000000l,
-          relaxedPcCalculation = false
-        ),
         new IBusCachedPlugin(
-          prediction = DYNAMIC_TARGET,
-          historyRamSizeLog2 = 8,
+          resetVector = 0x80000000l,
+          prediction = STATIC,
           config = InstructionCacheConfig(
-            cacheSize = 4096*2,
-            bytePerLine =32,
+            cacheSize = 4096,
+            bytePerLine = 32,
             wayCount = 1,
             addressWidth = 32,
             cpuDataWidth = 32,
@@ -29,25 +22,26 @@ object GenFullNoMmuMaxPerf extends App{
             catchIllegalAccess = true,
             catchAccessFault = true,
             asyncTagMemory = false,
-            twoCycleRam = false,
+            twoCycleRam = true,
             twoCycleCache = true
           )
         ),
         new DBusCachedPlugin(
           config = new DataCacheConfig(
-            cacheSize         = 4096*2,
-            bytePerLine       = 32,
-            wayCount          = 1,
-            addressWidth      = 32,
-            cpuDataWidth      = 32,
-            memDataWidth      = 32,
-            catchAccessError  = true,
-            catchIllegal      = true,
-            catchUnaligned    = true
+            cacheSize        = 4096,
+            bytePerLine      = 32,
+            wayCount         = 1,
+            addressWidth     = 32,
+            cpuDataWidth     = 32,
+            memDataWidth     = 32,
+            catchAccessError = true,
+            catchIllegal     = true,
+            catchUnaligned   = true
           )
         ),
-        new StaticMemoryTranslatorPlugin(
-          ioRange      = _(31 downto 28) === 0xF
+        new PmpPlugin(
+          regions = 16,
+          ioRange = _(31 downto 28) === 0xf
         ),
         new DecoderSimplePlugin(
           catchIllegalInstruction = true
@@ -61,7 +55,7 @@ object GenFullNoMmuMaxPerf extends App{
           separatedAddSub = false,
           executeInsertion = true
         ),
-        new FullBarrelShifterPlugin(earlyInjection = true),
+        new FullBarrelShifterPlugin,
         new HazardSimplePlugin(
           bypassExecute           = true,
           bypassMemory            = true,
@@ -71,9 +65,13 @@ object GenFullNoMmuMaxPerf extends App{
           pessimisticWriteRegFile = false,
           pessimisticAddressMatch = false
         ),
-        new MulPlugin,
-        new DivPlugin,
-        new CsrPlugin(CsrPluginConfig.small),
+        new MulDivIterativePlugin(
+          genMul = true,
+          genDiv = true,
+          mulUnrollFactor = 1,
+          divUnrollFactor = 1
+        ),
+        new CsrPlugin(CsrPluginConfig.secure(0x00000020l)),
         new DebugPlugin(ClockDomain.current.clone(reset = Bool().setName("debugReset"))),
         new BranchPlugin(
           earlyBranch = false,
