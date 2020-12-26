@@ -23,17 +23,20 @@ case class FirEngineConfig(
     // Coefficients are tightly packed one after the other in RAM,
     // so simply add length of each coefficient array together.
     def totalNrCoefs = filters.foldLeft(0){_ + _.coefs.length}
+    def maxDataAddr  = filters.foldLeft(0)((m,f) => ( if (f.dataBufStopAddr > m) f.dataBufStopAddr else m ))
+
 /*
+    FIXME: these 2 don't work due to some conflict between Scala and SpinalHDL
     //def maxDataAddr  = filters.foldLeft(0){_.max(_.dataBufStopAddr)}
     def maxDataAddr : Int = {
-        val maxAddr = 0
+        val maxAddr : Int = 0
         filters.foreach{
-            maxAddr.max(Int(_.dataBufStopAddr)) 
+            maxAddr.scala.runtime.RichInt.max(Int(_.dataBufStopAddr)) 
         }
 
         maxAddr
     }
-*/
+    */
 }
 
 class FirEngine(conf: FirEngineConfig) extends Component
@@ -44,7 +47,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
     }
 
     printf("totalNrCoefs: %d\n", conf.totalNrCoefs)
-//    printf("maxDataAddr: %d\n",  conf.maxDataAddr)
+    printf("maxDataAddr: %d\n",  conf.maxDataAddr)
 
 /*
     val memSize = 
