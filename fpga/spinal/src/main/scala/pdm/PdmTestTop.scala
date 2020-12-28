@@ -230,9 +230,9 @@ class PdmTestTop() extends Component
 
         val firs = ArrayBuffer[FirFilterInfo]()
 
-        firs += FirFilterInfo("HB1",    0,  63, true,  Array[Int](1,2,3,4,5,6,7,8,9)) 
-        firs += FirFilterInfo("HB2",   64, 127, true,  Array[Int](1,2,3,4,5)) 
-        firs += FirFilterInfo("FIR",  128, 192, false, Array[Int](1,2,3)) 
+        firs += FirFilterInfo("HB1",  256, true,  Array[Int](1,2,3,4,5,6,7,8,9)) 
+        firs += FirFilterInfo("HB2",   16, true,  Array[Int](1,2,3,4,5)) 
+        firs += FirFilterInfo("FIR",   64, false, Array[Int](1,2,3)) 
 
         val conf = FirEngineConfig(
             firs.toArray, 

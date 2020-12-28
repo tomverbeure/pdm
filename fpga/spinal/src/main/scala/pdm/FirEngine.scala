@@ -1,17 +1,23 @@
 
 package pdm
 
+import scala.collection.mutable.ArrayBuffer
+
 import spinal.core._
 import spinal.lib._
 
 case class FirFilterInfo( 
         name                : String, 
-        dataBufStartAddr    : Int, 
-        dataBufStopAddr     : Int, 
+        dataBufSize         : Int, 
         isHalfBand          : Boolean,
         coefs               : Array[Int]
     )
 {
+}
+
+case class FirEngineInfoHW() extends Bundle {
+
+
 }
 
 case class FirEngineConfig(
@@ -22,8 +28,12 @@ case class FirEngineConfig(
 {
     // Coefficients are tightly packed one after the other in RAM,
     // so simply add length of each coefficient array together.
-    def totalNrCoefs = filters.foldLeft(0){_ + _.coefs.length}
-    def maxDataAddr  = filters.foldLeft(0)((m,f) => ( if (f.dataBufStopAddr > m) f.dataBufStopAddr else m ))
+    def totalNrCoefs    = filters.foldLeft(0){_ + _.coefs.length}
+    def maxDataBufAddr  = dataBufStopAddrs.foldLeft(0)((m,f) => ( if (f > m) f else m ))
+
+    def coefBufStartAddrs    = filters.scanLeft(0){ _ + _.coefs.length }
+    def dataBufStartAddrs    = filters.scanLeft(0){ _ + _.dataBufSize }
+    def dataBufStopAddrs     = filters.scanLeft(filters(0).dataBufSize){ _ + _.dataBufSize}
 
 /*
     FIXME: these 2 don't work due to some conflict between Scala and SpinalHDL
@@ -37,6 +47,26 @@ case class FirEngineConfig(
         maxAddr
     }
     */
+
+    def nrMemDataBits = nrDataBits.max(nrCoefBits)
+    def nrMemAddrs    = maxDataBufAddr + 1 + totalNrCoefs
+
+    def allCoefs = filters.foldLeft(ArrayBuffer[Int](0)){ _ ++ _.coefs }
+
+    def memInit : Array[SInt] = {
+        val l = ArrayBuffer[SInt]()
+
+        allCoefs.foreach({ l.append(_) }) 
+        (0 to maxDataBufAddr).foreach({ _ => l.append(0) })
+        l.toArray
+   }
+
+   def toFirEngingINfoHW : FirEngineInfoHW = {
+      
+      val feiHW = FirEngineInfoHW()
+
+      feiHW
+   }
 }
 
 class FirEngine(conf: FirEngineConfig) extends Component
@@ -47,13 +77,13 @@ class FirEngine(conf: FirEngineConfig) extends Component
     }
 
     printf("totalNrCoefs: %d\n", conf.totalNrCoefs)
-    printf("maxDataAddr: %d\n",  conf.maxDataAddr)
+    printf("maxDataBufAddr: %d\n",  conf.maxDataBufAddr)
+    printf("nrMemAddrs: %d\n",  conf.nrMemAddrs)
 
-/*
-    val memSize = 
+    val memSize = conf.maxDataBufAddr + 1 + conf.totalNrCoefs
 
+    val u_mem = Mem(SInt(conf.nrMemDataBits bits), conf.memInit)
 
-    val u_mem = Mem(
-*/
+    io.data_out.payload  := u_mem.readSync(io.data_in.payload.asUInt.resize(log2Up(conf.nrMemAddrs))).resize(conf.nrDataBits)
 
 }
