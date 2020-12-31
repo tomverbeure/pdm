@@ -48,11 +48,11 @@ case class FirEngineConfig(
 
     def maxDataBufAddr        = dataBufStopAddrs.foldLeft(0)((m,f) => ( if (f > m) f else m ))
 
-    def coefBufStartAddrs     = filters.scanLeft(0){ _ + _.coefs.length }.dropRight(1)
-    def coefBufMiddleAddrs    = filters.scanLeft(filters(0).coefs.length/2){ _ + _.coefs.length }.dropRight(1)
-    def coefBufStopAddrs      = filters.scanLeft(filters(0).coefs.length-1){ _ + _.coefs.length }.dropRight(1)
-    def dataBufStartAddrs     = filters.scanLeft(0)({ _ + _.dataBufSize }).dropRight(1)
-    def dataBufStopAddrs      = filters.scanLeft(filters(0).dataBufSize-1)({ _ + _.dataBufSize}).dropRight(1)
+    def coefBufStartAddrs     = filters.scanLeft( 0)                          { _ + _.coefs.length }.dropRight(1)
+    def coefBufStopAddrs      = filters.scanLeft(-1)                          { _ + _.coefs.length }.drop(1)
+
+    def dataBufStartAddrs     = filters.scanLeft( 0) { _ + _.dataBufSize }.dropRight(1)
+    def dataBufStopAddrs      = filters.scanLeft(-1) { _ + _.dataBufSize }.drop(1)
 
     def maxDecimationRatio    = filters.foldLeft(0)((m,f) => ( if (f.decimationRatio > m) f.decimationRatio else m ))
 
@@ -147,7 +147,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
     for ((startAddr, i) <- conf.dataBufStartAddrs.zipWithIndex) { data_buf_start_addrs(i)  := startAddr   + conf.totalNrCoefs }
     for ((stopAddr,  i) <- conf.dataBufStopAddrs.zipWithIndex)  { data_buf_stop_addrs(i)   := stopAddr    + conf.totalNrCoefs }
     for ((startAddr, i) <- conf.coefBufStartAddrs.zipWithIndex) { coef_buf_start_addrs(i)  := startAddr  }
-    for ((middleAddr, i)<- conf.coefBufMiddleAddrs.zipWithIndex){ coef_buf_middle_addrs(i) := middleAddr }
+    for ((filter, i)    <- conf.filters.zipWithIndex)           { coef_buf_middle_addrs(i) := conf.coefBufStartAddrs(i) + filter.coefs.length/2 }
     for ((stopAddr, i)  <- conf.coefBufStopAddrs.zipWithIndex)  { coef_buf_stop_addrs(i)   := stopAddr   }
     for ((filter, i)    <- conf.filters.zipWithIndex)           { filter_is_halfbands(i)   := Bool(filter.isHalfBand)}
     for ((filter, i)    <- conf.filters.zipWithIndex)           { decimation_ratios(i)     := U(filter.decimationRatio) }
@@ -233,6 +233,10 @@ class FirEngine(conf: FirEngineConfig) extends Component
                 coef_buf_ptr      := coef_buf_start_addr
                 data_buf_rd_ptr   := data_buf_rd_start_ptr
                 cur_state         := FsmState.FetchCoef
+                
+                // We can immediately set this back to 0 as long as the write pointer is at least *decimation_ratio* larger than
+                // data_buf_rd_start_ptr + decimation_ratio
+                nr_new_inputs(0)  := 0
             }
         }
         is(FsmState.FetchCoef){
@@ -400,7 +404,8 @@ object FirEngineTopVerilogSyn {
     
             firs += FirFilterInfo("HB1",  256, true,  2, Array[Int](1,2,3,4,5,6,7,8,9)) 
             firs += FirFilterInfo("HB2",   64, true,  2, Array[Int](1,2,3,4,5)) 
-            firs += FirFilterInfo("FIR",   64, false, 1, Array[Int](1,2,3)) 
+            firs += FirFilterInfo("FIR1",  64, false, 1, Array[Int](1,2,3)) 
+            firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
 
             val conf = FirEngineConfig(
                 firs.toArray, 
