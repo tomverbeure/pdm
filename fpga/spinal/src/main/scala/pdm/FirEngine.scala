@@ -48,8 +48,8 @@ case class FirEngineConfig(
 
     def maxDataBufAddr        = dataBufStopAddrs.foldLeft(0)((m,f) => ( if (f > m) f else m ))
 
-    def coefBufStartAddrs     = filters.scanLeft( 0)                          { _ + _.coefs.length }.dropRight(1)
-    def coefBufStopAddrs      = filters.scanLeft(-1)                          { _ + _.coefs.length }.drop(1)
+    def coefBufStartAddrs     = filters.scanLeft( 0) { _ + _.coefs.length }.dropRight(1)
+    def coefBufStopAddrs      = filters.scanLeft(-1) { _ + _.coefs.length }.drop(1)
 
     def dataBufStartAddrs     = filters.scanLeft( 0) { _ + _.dataBufSize }.dropRight(1)
     def dataBufStopAddrs      = filters.scanLeft(-1) { _ + _.dataBufSize }.drop(1)
@@ -172,16 +172,14 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
     val data_buf_rd_start_ptr   = data_buf_rd_start_ptrs(filter_cntr)
     val coef_buf_start_addr     = coef_buf_start_addrs(filter_cntr)
-    val nr_new_input            = nr_new_inputs(filter_cntr)
 
     // the _next signals are used to update the write point of the next stage filter.
     val filter_cntr_next  = UInt(log2Up(conf.filters.size) bits)
     filter_cntr_next  := (filter_cntr === conf.filters.size-1) ? U(0) | filter_cntr + 1 
 
-    val data_buf_wr_ptr_fnext      = data_buf_wr_ptrs(filter_cntr_next)
-    val data_buf_start_addr_fnext  = data_buf_start_addrs(filter_cntr_next)
-    val data_buf_stop_addr_fnext   = data_buf_stop_addrs(filter_cntr_next)
-    val coef_buf_start_addr_fnext  = coef_buf_start_addrs(filter_cntr_next)
+    val data_buf_wr_ptr_fnext       = data_buf_wr_ptrs(filter_cntr_next)
+    val nr_new_input_fnext          = nr_new_inputs(filter_cntr_next)
+    val decimation_ratio_fnext      = decimation_ratios(filter_cntr_next)
 
     val coef_buf_ptr            = Reg(UInt(conf.nrMemAddrBits bits)) init(0)
     val data_buf_rd_ptr         = Reg(UInt(conf.nrMemAddrBits bits)) init(0)
@@ -196,11 +194,10 @@ class FirEngine(conf: FirEngineConfig) extends Component
     val fir_mem_wr_addr_p0            = UInt(conf.nrMemAddrBits bits)
     val fir_mem_wr_data_is_output_p0  = Bool
 
-    val decim_cntr        = Reg(UInt(log2Up(conf.maxDecimationRatio+1) bits)) init(0)
-
     object FsmState extends SpinalEnum {
         val Config          = newElement()
         val Idle            = newElement()
+        val SetupStage      = newElement()
         val FetchCoef       = newElement()
         val FetchData       = newElement()
     }
@@ -228,16 +225,17 @@ class FirEngine(conf: FirEngineConfig) extends Component
         is(FsmState.Idle){
             when(nr_new_inputs(0) === decimation_ratios(0)){
                 filter_cntr       := 0
-                decim_cntr        := 0
-
-                coef_buf_ptr      := coef_buf_start_addr
-                data_buf_rd_ptr   := data_buf_rd_start_ptr
-                cur_state         := FsmState.FetchCoef
+                cur_state         := FsmState.SetupStage
                 
                 // We can immediately set this back to 0 as long as the write pointer is at least *decimation_ratio* larger than
                 // data_buf_rd_start_ptr + decimation_ratio
                 nr_new_inputs(0)  := 0
             }
+        }
+        is(FsmState.SetupStage){
+            coef_buf_ptr              := coef_buf_start_addr
+            data_buf_rd_ptr           := data_buf_rd_start_ptr
+            cur_state                 := FsmState.FetchCoef
         }
         is(FsmState.FetchCoef){
             mem_rd_data_is_coef_p0    := True
@@ -266,47 +264,50 @@ class FirEngine(conf: FirEngineConfig) extends Component
                 data_buf_rd_ptr       := (data_buf_rd_ptr === data_buf_stop_addr)   ? data_buf_start_addr | data_buf_rd_ptr + 1
             }
 
-            when(coef_buf_ptr === coef_buf_stop_addr){
+            when(coef_buf_ptr =/= coef_buf_stop_addr){
+                // Current filter still ongoing
+                coef_buf_ptr    := coef_buf_ptr + 1
+                cur_state       := FsmState.FetchCoef
+                branch_nr       := 1
+            }
+            .otherwise{
                 // Last element of the filter. 
 
+                // Increase start of input data buffer for current filter by <decimation ratio>
                 data_buf_rd_start_ptr   := ((data_buf_rd_start_ptr_p_decim > data_buf_stop_addr) ? (data_buf_rd_start_ptr_p_decim - data_buf_stop_addr + data_buf_start_addr) 
                                                                                                  |  data_buf_rd_start_ptr_p_decim).resize(conf.nrMemAddrBits)
 
 
+                // Write newly calculated output to input buffer of the next filter or the output
                 fir_mem_wr_en_p0              := True
                 fir_mem_wr_addr_p0            := data_buf_wr_ptr_fnext;
                 fir_mem_wr_data_is_output_p0  := (filter_cntr === conf.filters.size-1)
 
                 data_buf_wr_ptr_fnext := (data_buf_wr_ptr_fnext === data_buf_stop_addr) ? data_buf_start_addr | data_buf_wr_ptr_fnext + 1
 
-                when(decim_cntr =/= decimation_ratio-1){
-                    // Rerun same filter decimation_ratio times
-                    decim_cntr      := decim_cntr + 1
-                    coef_buf_ptr    := coef_buf_start_addr
+                when(filter_cntr === conf.filters.size-1){
+                    // Last filter stage created an output. Back to idle.
+                    filter_cntr           := 0
 
-                    cur_state       := FsmState.FetchCoef
-                    branch_nr       := 1
+                    cur_state             := FsmState.Idle
+                    branch_nr             := 2
                 }
-                .elsewhen(filter_cntr =/= conf.filters.size-1){
-                    // Switch to next filter in the chain
-                    filter_cntr     := filter_cntr + 1
-                    decim_cntr      := 0
-                    coef_buf_ptr    := coef_buf_start_addr_fnext
+                .elsewhen(nr_new_input_fnext =/= decimation_ratio_fnext-1){
+                    // We don't have enough new samples yet for the next stage. Back to idle.
+                    nr_new_input_fnext    := nr_new_input_fnext + 1
+                    filter_cntr           := 0
 
-                    cur_state       := FsmState.FetchCoef
-                    branch_nr       := 2
+                    cur_state             := FsmState.Idle
+                    branch_nr             := 3
                 }
                 .otherwise{
-                    // Done
-                    filter_cntr     := 0
-                    cur_state       := FsmState.Idle
-                    branch_nr       := 3
+                    // Switch to next filter in the chain
+                    filter_cntr           := filter_cntr + 1
+                    nr_new_input_fnext    := U(0, nr_new_inputs(0).getWidth bits)
+
+                    cur_state             := FsmState.SetupStage
+                    branch_nr             := 4
                 }
-            }
-            .otherwise{
-                coef_buf_ptr    := coef_buf_ptr + 1
-                cur_state       := FsmState.FetchCoef
-                branch_nr       := 4
             }
         }
     }
@@ -403,8 +404,8 @@ object FirEngineTopVerilogSyn {
             val firs = ArrayBuffer[FirFilterInfo]()
     
             firs += FirFilterInfo("HB1",  256, true,  2, Array[Int](1,2,3,4,5,6,7,8,9)) 
-            firs += FirFilterInfo("HB2",   64, true,  2, Array[Int](1,2,3,4,5)) 
-            firs += FirFilterInfo("FIR1",  64, false, 1, Array[Int](1,2,3)) 
+            firs += FirFilterInfo("HB2",   64, true,  4, Array[Int](1,2,3,4,5)) 
+            firs += FirFilterInfo("FIR1",  64, false, 2, Array[Int](1,2,3)) 
             firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
 
             val conf = FirEngineConfig(

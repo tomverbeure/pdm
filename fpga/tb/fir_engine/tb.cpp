@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 
     for(int i=0;i<10000;++i){
         
-        if (i%1000 == 500){
+        if (i%100 == 50){
             *io_data_in_valid.curr = 1;
             *io_data_in_payload.curr = payload_value;
             payload_value += 20;
