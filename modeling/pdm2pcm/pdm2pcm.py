@@ -9,6 +9,8 @@ from matplotlib.ticker import EngFormatter
 from scipy import signal
 from filter_lib import *
 
+import json
+
 plot_cic_decimation_passband_droop  = True
 plot_cic_stages_passband_droop      = True
 passband_droop_table                = False
@@ -17,7 +19,7 @@ passband_stopband_attenuation_table = False
 number_of_muls_table                = False
 plot_pdm2pcm_filters                = True
 
-save_blog = True
+save_blog = False
 
 import platform
 if platform.system() == "Darwin":
@@ -562,5 +564,41 @@ if plot_pdm2pcm_filters:
     if save_blog: plt.savefig(BLOG_PATH + "pdm2pcm_filters.svg")
 
 
+    #============================================================
+    # Write all filter parameters are json 
+    #============================================================
+
+    all_filters = [
+            {
+                'name'          : "CIC",
+                'is_cic'        : True,
+                'decimation'    : 12,
+                'cic_order'     : 4,
+            },
+            {
+                'name'          : "HB1",
+                'is_fir'        : True,
+                'is_halfband'   : True,
+                'decimation'    : 2, 
+                'coefs'         : hb1_h.tolist(),
+            },
+            {
+                'name'          : "HB2",
+                'is_fir'        : True,
+                'is_halfband'   : True,
+                'decimation'    : 2, 
+                'coefs'         : hb2_h.tolist(),
+            },
+            {
+                'name'          : "FIR",
+                'is_fir'        : True,
+                'is_halfband'   : False,
+                'decimation'    : 2, 
+                'coefs'         : fir_h.tolist(),
+            },
+        ]
+
+    with open("pdm_pcm_filters.json", 'w') as pdm_pcm_filters:
+        json.dump(all_filters, pdm_pcm_filters, indent=4)
 
 
