@@ -55,6 +55,7 @@ case class FirEngineConfig(
     def dataBufStopAddrs      = filters.scanLeft(-1) { _ + _.dataBufSize }.drop(1)
 
     def maxDecimationRatio    = filters.foldLeft(0)((m,f) => ( if (f.decimationRatio > m) f.decimationRatio else m ))
+    def totalDecimationRatio  = filters.foldLeft(1){ _ * _.decimationRatio } 
 
 /*
     FIXME: these 2 don't work due to some conflict between Scala and SpinalHDL
@@ -105,6 +106,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
     printf("maxDataBufAddr: %d\n",  conf.maxDataBufAddr)
     printf("nrMemAddrs: %d\n",  conf.nrMemAddrs)
     printf("maxDecimationRatio: %d\n",  conf.maxDecimationRatio)
+    printf("totalDecimationRatio: %d\n",  conf.totalDecimationRatio)
 
     //============================================================
     // Data and coefficient RAM - Read
@@ -155,7 +157,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
     // Variables 
     val data_buf_wr_ptrs        = Vec(Reg(UInt(conf.nrMemAddrBits bits)) init(0), conf.filters.size)
     val data_buf_rd_start_ptrs  = Vec(Reg(UInt(conf.nrMemAddrBits bits)) init(0), conf.filters.size)
-    val nr_new_inputs           = Vec(Reg(UInt(log2Up(conf.maxDecimationRatio+1) bits)) init(0), conf.filters.size)
+    val nr_new_inputs           = Vec(Reg(UInt(log2Up(conf.totalDecimationRatio+1) bits)) init(0), conf.filters.size)
 
     //============================================================
     // Context for currently selected stage
@@ -214,6 +216,8 @@ class FirEngine(conf: FirEngineConfig) extends Component
     fir_mem_wr_addr_p0            := 0
     fir_mem_wr_data_is_output_p0  := False
 
+    val is_last_filter_stage = (filter_cntr === conf.filters.size-1)
+
     switch(cur_state){
         is(FsmState.Config){
             for ((startAddr, i) <- conf.dataBufStartAddrs.zipWithIndex) { data_buf_rd_start_ptrs(i)  := startAddr + conf.totalNrCoefs }
@@ -223,13 +227,13 @@ class FirEngine(conf: FirEngineConfig) extends Component
             cur_state         := FsmState.Idle
         }
         is(FsmState.Idle){
-            when(nr_new_inputs(0) === decimation_ratios(0)){
+          when(nr_new_inputs(0) >= decimation_ratios(0)){
                 filter_cntr       := 0
                 cur_state         := FsmState.SetupStage
                 
                 // We can immediately set this back to 0 as long as the write pointer is at least *decimation_ratio* larger than
                 // data_buf_rd_start_ptr + decimation_ratio
-                nr_new_inputs(0)  := 0
+                nr_new_inputs(0)  := nr_new_inputs(0) - decimation_ratios(0)
             }
         }
         is(FsmState.SetupStage){
@@ -280,12 +284,14 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
                 // Write newly calculated output to input buffer of the next filter or the output
                 fir_mem_wr_en_p0              := True
-                fir_mem_wr_addr_p0            := data_buf_wr_ptr_fnext;
-                fir_mem_wr_data_is_output_p0  := (filter_cntr === conf.filters.size-1)
+                fir_mem_wr_addr_p0            := data_buf_wr_ptr_fnext
+                fir_mem_wr_data_is_output_p0  := is_last_filter_stage
 
-                data_buf_wr_ptr_fnext := (data_buf_wr_ptr_fnext === data_buf_stop_addr) ? data_buf_start_addr | data_buf_wr_ptr_fnext + 1
+                when(!is_last_filter_stage){
+                    data_buf_wr_ptr_fnext := (data_buf_wr_ptr_fnext === data_buf_stop_addr) ? data_buf_start_addr | data_buf_wr_ptr_fnext + 1
+                }
 
-                when(filter_cntr === conf.filters.size-1){
+                when(is_last_filter_stage){
                     // Last filter stage created an output. Back to idle.
                     filter_cntr           := 0
 
@@ -377,12 +383,14 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
     io.data_in.ready    := False
 
+    //val data_buf_wr_ptr_0_incr = (data_buf_wr_ptrs(0) === data_buf_stop_addr) ? data_buf_start_addr | data_buf_wr_ptrs(0) + 1
+
     when(fir_mem_wr_en_final && !fir_mem_wr_data_is_output_final){
         mem_wr_en           := fir_mem_wr_en_final
         mem_wr_addr         := fir_mem_wr_addr_final
         mem_wr_data         := fir_mem_wr_data_final.resize(conf.nrMemDataBits)
     }
-    .elsewhen(io.data_in.valid && nr_new_inputs(0) =/= decimation_ratios(0) ){
+    .elsewhen(io.data_in.valid && !nr_new_inputs(0).andR){
         io.data_in.ready    := True
 
         mem_wr_en           := True
