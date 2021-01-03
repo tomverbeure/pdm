@@ -23,6 +23,9 @@ compile: \
 tb: tb.cpp FirEngine.cpp $(SRC) $(OBJ)
 	$(CLANG) -g -O3 -std=c++14 -I $(YOSYS_INCLUDE) $(SRC) $(OBJ) -o $@
 
+tb_v: tb.v $(VERILOG)
+	iverilog $^ -o $@
+
 .PHONY: FirEngine.cpp
 FirEngine.cpp:
 	cp $(MEM_FILES) .

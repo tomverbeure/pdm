@@ -122,18 +122,22 @@ int main(int argc, char **argv)
     top.p_reset.set<bool>(false);
 
     cxxrtl::debug_item io_data_in_valid     = all_debug_items.at("io_data_in_valid");
+    cxxrtl::debug_item io_data_in_ready     = all_debug_items.at("io_data_in_ready");
     cxxrtl::debug_item io_data_in_payload   = all_debug_items.at("io_data_in_payload");
 
-    int payload_value = 4096;
+    int valid_value     = 0;
+    int payload_value   = 4096;
 
     for(int i=0;i<100000;++i){
         
         if (i%42 == 10){
-            *io_data_in_valid.curr = 1;
-            *io_data_in_payload.curr = payload_value;
+            valid_value     = 1;
+            *io_data_in_valid.curr      = valid_value;
+            *io_data_in_payload.curr    = payload_value;
         }
-        else{
-            *io_data_in_valid.curr = 0;
+        else if (*io_data_in_ready.curr && valid_value == 1){
+            valid_value             = 0;
+            *io_data_in_valid.curr  = valid_value;
         }
 
         top.p_clk.set<bool>(false);

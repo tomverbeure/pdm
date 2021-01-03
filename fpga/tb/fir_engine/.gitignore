@@ -1,4 +1,6 @@
 FirEngine.*
 tb
+tb_v
 yosys.log
 waves.*
+*.vcd
