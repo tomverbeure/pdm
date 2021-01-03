@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 
     for(int i=0;i<100000;++i){
         
-        if (i%50 == 10){
+        if (i%42 == 10){
             *io_data_in_valid.curr = 1;
             *io_data_in_payload.curr = payload_value;
         }
@@ -139,8 +139,8 @@ int main(int argc, char **argv)
         top.p_clk.set<bool>(false);
         top.step();
 
-//        if (dump_level >=1 && dump_level <= 3)
-//            vcd.sample(i*2 + 0);
+        if (dump_level >=1 && dump_level <= 3)
+            vcd.sample(i*2 + 0);
 
         top.p_clk.set<bool>(true);
         top.step();
