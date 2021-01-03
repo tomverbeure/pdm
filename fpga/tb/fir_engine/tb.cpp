@@ -9,6 +9,60 @@
 
 using namespace std;
 
+typedef struct {
+    const char  *name;
+    bool        is_halfband;
+    int         decimation;
+    int         nr_coefs;
+    const int   *coefs;
+} filter_info_t;
+
+/*
+const int hb1_coefs[] = { 1,2,3};
+
+filter_info_t hb1 = {
+    "HB1", 
+    true,
+    10,
+    2,
+    &hb1_coefs[0]
+};
+
+filter_info_t firs = { hb1 };
+*/
+
+const int hb1_coefs[] = { 878, -6713, 38602, 65535, 38602, -6713, 878 };
+const int hb2_coefs[] = { 94, -723, 3032, -9781, 40145, 65535, 40145, -9781, 3032, -723, 94 };
+const int fir_coefs[] = { -14, -50, -84, -49, 117, 349, 423, 108, -518, -932, -518, 737, 1854, 1476, -738, -3193, -3245, 293, 5148, 6520, 1184, -8322, -13605, -5839, 16758, 45494, 65535, 65535, 45494, 16758, -5839, -13605, -8322, 1184, 6520, 5148, 293, -3245, -3193, -738, 1476, 1854, 737, -518, -932, -518, 108, 423, 349, 117, -49, -84, -50, -14 };
+
+filter_info_t hb1_info = {
+    "HB1",
+    1,
+    2,
+    7,
+    &hb1_coefs[0]
+};
+
+filter_info_t hb2_info = {
+    "HB2",
+    1,
+    2,
+    11,
+    &hb2_coefs[0]
+};
+
+filter_info_t fir_info = {
+    "FIR",
+    0,
+    1,
+    54,
+    &fir_coefs[0]
+};
+
+
+filter_info_t firs[] = { hb1_info, hb2_info, fir_info };
+
+
 int main(int argc, char **argv)
 {
     char *filename;
@@ -70,14 +124,13 @@ int main(int argc, char **argv)
     cxxrtl::debug_item io_data_in_valid     = all_debug_items.at("io_data_in_valid");
     cxxrtl::debug_item io_data_in_payload   = all_debug_items.at("io_data_in_payload");
 
-    int payload_value = 10;
+    int payload_value = 4096;
 
-    for(int i=0;i<10000;++i){
+    for(int i=0;i<100000;++i){
         
-        if (i%100 == 50){
+        if (i%50 == 10){
             *io_data_in_valid.curr = 1;
             *io_data_in_payload.curr = payload_value;
-            payload_value += 20;
         }
         else{
             *io_data_in_valid.curr = 0;

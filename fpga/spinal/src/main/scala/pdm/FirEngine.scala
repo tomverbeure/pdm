@@ -395,18 +395,33 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
 }
 
-
 object FirEngineTopVerilogSyn {
     def main(args: Array[String]) {
 
+
+
         val config = SpinalConfig(anonymSignalUniqueness = true)
         config.generateVerilog({
+
             val firs = ArrayBuffer[FirFilterInfo]()
     
-            firs += FirFilterInfo("HB1",  256, true,  2, Array[Int](1,2,3,4,5,6,7,8,9)) 
-            firs += FirFilterInfo("HB2",   64, true,  4, Array[Int](1,2,3,4,5)) 
-            firs += FirFilterInfo("FIR1",  64, false, 2, Array[Int](1,2,3)) 
-            firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
+            if (false){
+                firs += FirFilterInfo("HB1",  256, true,  2, Array[Int](1,2,3,4,5,6,7,8,9)) 
+                firs += FirFilterInfo("HB2",   64, true,  4, Array[Int](1,2,3,4,5)) 
+                firs += FirFilterInfo("FIR1",  64, false, 2, Array[Int](1,2,3)) 
+                firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
+            }
+            else{
+                firs += FirFilterInfo("HB1", 19, true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
+                firs += FirFilterInfo("HB2", 27, true, 2, Array[Int](94,-723,3032,-9781,40145,65535,40145,-9781,3032,-723,94))
+                firs += FirFilterInfo("FIR", 62, false, 1, Array[Int](-14,-50,-84,-49,117,349,423,108,-518,-932,-518,737,1854,1476,
+                                                                      -738,-3193,-3245,293,5148,6520,1184,-8322,-13605,-5839,16758,
+                                                                      45494,65535,65535,45494,16758,-5839,-13605,-8322,1184,6520,5148,
+                                                                      293,-3245,-3193,-738,1476,1854,737,-518,-932,-518,108,423,
+                                                                      349,117,-49,-84,-50,-14))
+
+            }
+            
 
             val conf = FirEngineConfig(
                 firs.toArray, 
@@ -419,5 +434,4 @@ object FirEngineTopVerilogSyn {
         })
     }
 }
-
 
