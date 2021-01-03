@@ -57,6 +57,8 @@ case class FirEngineConfig(
     def maxDecimationRatio    = filters.foldLeft(0)((m,f) => ( if (f.decimationRatio > m) f.decimationRatio else m ))
     def totalDecimationRatio  = filters.foldLeft(1){ _ * _.decimationRatio } 
 
+    def filterOrders          = filters.scanLeft(0)((m,f) => ( if (f.isHalfBand) (f.coefs.length-1)*2 else f.coefs.length-1 )).drop(1)
+
 /*
     FIXME: these 2 don't work due to some conflict between Scala and SpinalHDL
     //def maxDataAddr  = filters.foldLeft(0){_.max(_.dataBufStopAddr)}
@@ -179,6 +181,8 @@ class FirEngine(conf: FirEngineConfig) extends Component
     val filter_cntr_next  = UInt(log2Up(conf.filters.size) bits)
     filter_cntr_next  := (filter_cntr === conf.filters.size-1) ? U(0) | filter_cntr + 1 
 
+    val data_buf_start_addr_fnext   = data_buf_start_addrs(filter_cntr_next)
+    val data_buf_stop_addr_fnext    = data_buf_stop_addrs(filter_cntr_next)
     val data_buf_wr_ptr_fnext       = data_buf_wr_ptrs(filter_cntr_next)
     val nr_new_input_fnext          = nr_new_inputs(filter_cntr_next)
     val decimation_ratio_fnext      = decimation_ratios(filter_cntr_next)
@@ -220,9 +224,11 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
     switch(cur_state){
         is(FsmState.Config){
-            for ((startAddr, i) <- conf.dataBufStartAddrs.zipWithIndex) { data_buf_rd_start_ptrs(i)  := startAddr + conf.totalNrCoefs }
-            for ((startAddr, i) <- conf.dataBufStartAddrs.zipWithIndex) { data_buf_wr_ptrs(i)        := startAddr + conf.totalNrCoefs + 32 }      // FIXME
-            for ((filter, i)    <- conf.filters.zipWithIndex)           { nr_new_inputs(i)           := 0 }
+            for ((filter, i) <- conf.filters.zipWithIndex){
+                data_buf_rd_start_ptrs(i)  := conf.dataBufStartAddrs(i)                            + conf.totalNrCoefs
+                data_buf_wr_ptrs(i)        := conf.dataBufStartAddrs(i) + conf.filterOrders(i) + 2 + conf.totalNrCoefs
+                nr_new_inputs(i)           := 0 
+            }
 
             cur_state         := FsmState.Idle
         }
@@ -288,7 +294,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
                 fir_mem_wr_data_is_output_p0  := is_last_filter_stage
 
                 when(!is_last_filter_stage){
-                    data_buf_wr_ptr_fnext := (data_buf_wr_ptr_fnext === data_buf_stop_addr) ? data_buf_start_addr | data_buf_wr_ptr_fnext + 1
+                    data_buf_wr_ptr_fnext := (data_buf_wr_ptr_fnext === data_buf_stop_addr_fnext) ? data_buf_start_addr_fnext | data_buf_wr_ptr_fnext + 1
                 }
 
                 when(is_last_filter_stage){
@@ -397,7 +403,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
         mem_wr_addr         := data_buf_wr_ptrs(0)
         mem_wr_data         := io.data_in.payload.resize(conf.nrMemDataBits)
 
-        data_buf_wr_ptrs(0) := (data_buf_wr_ptrs(0) === data_buf_stop_addr) ? data_buf_start_addr | data_buf_wr_ptrs(0) + 1
+        data_buf_wr_ptrs(0) := (data_buf_wr_ptrs(0) === data_buf_stop_addrs(0)) ? data_buf_start_addrs(0) | data_buf_wr_ptrs(0) + 1
         nr_new_inputs(0)    := nr_new_inputs(0) + 1
     }
 
@@ -420,7 +426,7 @@ object FirEngineTopVerilogSyn {
                 firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
             }
             else{
-                firs += FirFilterInfo("HB1", 19, true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
+                firs += FirFilterInfo("HB1", 25, true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
                 firs += FirFilterInfo("HB2", 27, true, 2, Array[Int](94,-723,3032,-9781,40145,65535,40145,-9781,3032,-723,94))
                 firs += FirFilterInfo("FIR", 62, false, 1, Array[Int](-14,-50,-84,-49,117,349,423,108,-518,-932,-518,737,1854,1476,
                                                                       -738,-3193,-3245,293,5148,6520,1184,-8322,-13605,-5839,16758,
@@ -436,6 +442,8 @@ object FirEngineTopVerilogSyn {
                 16,
                 18
             )
+
+            conf.filterOrders.foreach { printf("order: %d\n", _) }
 
             val toplevel = new FirEngine(conf)
             toplevel
