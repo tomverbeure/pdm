@@ -125,13 +125,24 @@ int main(int argc, char **argv)
     cxxrtl::debug_item io_data_in_ready     = all_debug_items.at("io_data_in_ready");
     cxxrtl::debug_item io_data_in_payload   = all_debug_items.at("io_data_in_payload");
 
+    cxxrtl::debug_item io_data_out_valid    = all_debug_items.at("io_data_out_valid");
+    cxxrtl::debug_item io_data_out_payload  = all_debug_items.at("io_data_out_payload");
+
     int valid_value     = 0;
-    int payload_value   = 4096;
+    int payload_value   = 0;
+
+    int input_sample_nr = 0;
 
     for(int i=0;i<100000;++i){
         
         if (i%42 == 10){
             valid_value     = 1;
+            if (input_sample_nr == 200)
+                payload_value = 32767;
+            else
+                payload_value = 0;
+            ++input_sample_nr;
+
             *io_data_in_valid.curr      = valid_value;
             *io_data_in_payload.curr    = payload_value;
         }
@@ -139,6 +150,11 @@ int main(int argc, char **argv)
             valid_value             = 0;
             *io_data_in_valid.curr  = valid_value;
         }
+
+        if (*io_data_out_valid.curr == 1){
+            printf("data_out: %d\n", *io_data_out_payload.curr);
+        }
+
 
         top.p_clk.set<bool>(false);
         top.step();

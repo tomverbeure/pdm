@@ -83,7 +83,7 @@ case class FirEngineConfig(
         val l = ArrayBuffer[SInt]()
 
         allCoefs.foreach({ l.append(_) }) 
-        (0 to maxDataBufAddr).foreach({ _ => l.append(1) })
+        (0 to maxDataBufAddr).foreach({ _ => l.append(0) })
         l.toArray
     }
 
@@ -179,7 +179,11 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
     // the _next signals are used to update the write point of the next stage filter.
     val filter_cntr_next  = UInt(log2Up(conf.filters.size) bits)
-    filter_cntr_next  := (filter_cntr === conf.filters.size-1) ? U(0) | filter_cntr + 1 
+
+    if (conf.filters.size == 1)
+        filter_cntr_next  := U(0) 
+    else 
+        filter_cntr_next  := (filter_cntr === conf.filters.size-1) ? U(0) | filter_cntr + 1
 
     val data_buf_start_addr_fnext   = data_buf_start_addrs(filter_cntr_next)
     val data_buf_stop_addr_fnext    = data_buf_stop_addrs(filter_cntr_next)
@@ -314,7 +318,9 @@ class FirEngine(conf: FirEngineConfig) extends Component
                 }
                 .otherwise{
                     // Switch to next filter in the chain
-                    filter_cntr           := filter_cntr + 1
+                    if (conf.filters.size != 1)
+                        filter_cntr       := filter_cntr + 1
+
                     nr_new_input_fnext    := U(0, nr_new_inputs(0).getWidth bits)
 
                     cur_state             := FsmState.SetupStage
@@ -359,7 +365,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
     val fir_mem_wr_en_final              = Delay(fir_mem_wr_en_p0, 4)
     val fir_mem_wr_addr_final            = Delay(fir_mem_wr_addr_p0, 4)
     val fir_mem_wr_data_is_output_final  = Delay(fir_mem_wr_data_is_output_p0, 4)
-    val fir_mem_wr_data_final            = accum_p4.resize(conf.nrDataBits)
+    val fir_mem_wr_data_final            = (accum_p4 >> (conf.nrCoefBits-1)).resize(conf.nrDataBits)
 
     io.data_out.valid     := False
     io.data_out.payload   := 0      // FIXME: make permanent assigment to accum
@@ -425,7 +431,7 @@ object FirEngineTopVerilogSyn {
                 firs += FirFilterInfo("FIR1",  64, false, 2, Array[Int](1,2,3)) 
                 firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
             }
-            else{
+            else if (false){
                 firs += FirFilterInfo("HB1", 25, true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
                 firs += FirFilterInfo("HB2", 27, true, 2, Array[Int](94,-723,3032,-9781,40145,65535,40145,-9781,3032,-723,94))
                 firs += FirFilterInfo("FIR", 62, false, 1, Array[Int](-14,-50,-84,-49,117,349,423,108,-518,-932,-518,737,1854,1476,
@@ -434,6 +440,10 @@ object FirEngineTopVerilogSyn {
                                                                       293,-3245,-3193,-738,1476,1854,737,-518,-932,-518,108,423,
                                                                       349,117,-49,-84,-50,-14))
 
+            }
+            else{
+                firs += FirFilterInfo("FIR1",  20, false,  1, Array[Int](131071)) 
+                firs += FirFilterInfo("FIR2",  20, false,  1, Array[Int](131071)) 
             }
             
 
