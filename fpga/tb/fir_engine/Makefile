@@ -8,7 +8,7 @@ OBJ 			=
 VERILOG			= ../../spinal/FirEngine.v
 MEM_FILES		= ../../spinal/FirEngine.v_toplevel_u_mem.bin
 
-CLANG			= clang++-9
+CLANG			= clang++
 
 YOSYS_PREPROC = "read_verilog -formal $(VERILOG); hierarchy -check -top FirEngine"
 YOSYS_RECIPE  = ""
