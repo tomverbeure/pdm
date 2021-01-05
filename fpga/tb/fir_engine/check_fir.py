@@ -17,16 +17,18 @@ N       = 100000
 x = np.linspace(0.0, N/fs_in, N)
 
 freq1 = 5000
-freq2 = 8000
-freq3 = 20000
-freq4 = fs_in/2.5
+freq2 = 6000
+freq3 = 8000
+freq4 = 10000
+freq5 = fs_in/2.5
 
 y1 = 1 * np.sin(2 * np.pi * freq1 * x)
 y2 = 1 * np.sin(2 * np.pi * freq2 * x)
 y3 = 1 * np.sin(2 * np.pi * freq3 * x)
 y4 = 1 * np.sin(2 * np.pi * freq4 * x)
+y5 = 1 * np.sin(2 * np.pi * freq5 * x)
 
-y_in = y1 + y2 + y3 + y4 + np.random.randn(N) * 0.01
+y_in = y1 + y2 + y3 + y4 + y5 + np.random.randn(N) * 0.1
 
 y_in_int = np.round(y_in * (2**12))
 y_in = y_in_int / (2**12)
@@ -62,13 +64,14 @@ with open("data_in_sines.txt", "wt+") as data_in_file:
 
 os.system("./tb -c 41 -d 2 -i %s -o %s" % ("data_in_sines.txt", "data_out_sines.txt"))
 
-decim = 1
+decim = 4
 
 y_out = []
 with open("data_out_sines.txt", "rt+") as data_out_file:
     y_out = [int(l.strip()) for l in data_out_file.readlines()]
 
 y_out = np.asarray(y_out[len(y_out)-len(y_in)//decim:])
+#y_out = np.asarray(y_out[2:len(y_in)-2])
 y_out = y_out / (2**12)
 
 print(len(y_out))
