@@ -47,6 +47,7 @@ case class FirEngineConfig(
     def maxNrCoefs            = filters.foldLeft(0)((m,f) => ( if (f.coefs.size > m) f.coefs.size else m ))
 
     def maxDataBufAddr        = dataBufStopAddrs.foldLeft(0)((m,f) => ( if (f > m) f else m ))
+    def maxDataBufSize        = filters.foldLeft(0)((m,f) => ( if (f.dataBufSize > m) f.dataBufSize else m ))
 
     def coefBufStartAddrs     = filters.scanLeft( 0) { _ + _.coefs.length }.dropRight(1)
     def coefBufStopAddrs      = filters.scanLeft(-1) { _ + _.coefs.length }.drop(1)
@@ -140,8 +141,10 @@ class FirEngine(conf: FirEngineConfig) extends Component
     //============================================================
 
     // Fixed config values
-    val data_buf_start_addrs    = Vec(UInt(conf.nrMemAddrBits bits), conf.filters.size)
-    val data_buf_stop_addrs     = Vec(UInt(conf.nrMemAddrBits bits), conf.filters.size)
+    val data_buf_start_addrs    = Vec(UInt(conf.nrMemAddrBits bits),          conf.filters.size)
+    val data_buf_stop_addrs     = Vec(UInt(conf.nrMemAddrBits bits),          conf.filters.size)
+    val data_buf_sizes          = Vec(UInt(log2Up(conf.maxDataBufSize) bits), conf.filters.size)
+
     val coef_buf_start_addrs    = Vec(UInt(conf.nrMemAddrBits bits), conf.filters.size)
     val coef_buf_middle_addrs   = Vec(UInt(conf.nrMemAddrBits bits), conf.filters.size)
     val coef_buf_stop_addrs     = Vec(UInt(conf.nrMemAddrBits bits), conf.filters.size)
@@ -150,6 +153,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
     for ((startAddr, i) <- conf.dataBufStartAddrs.zipWithIndex) { data_buf_start_addrs(i)  := startAddr   + conf.totalNrCoefs }
     for ((stopAddr,  i) <- conf.dataBufStopAddrs.zipWithIndex)  { data_buf_stop_addrs(i)   := stopAddr    + conf.totalNrCoefs }
+    for ((filter, i)    <- conf.filters.zipWithIndex)           { data_buf_sizes(i)        := filter.dataBufSize }
     for ((startAddr, i) <- conf.coefBufStartAddrs.zipWithIndex) { coef_buf_start_addrs(i)  := startAddr  }
     for ((filter, i)    <- conf.filters.zipWithIndex)           { coef_buf_middle_addrs(i) := conf.coefBufStartAddrs(i) + filter.coefs.length/2 }
     for ((stopAddr, i)  <- conf.coefBufStopAddrs.zipWithIndex)  { coef_buf_stop_addrs(i)   := stopAddr   }
@@ -169,6 +173,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
     val data_buf_start_addr     = data_buf_start_addrs(filter_cntr)
     val data_buf_stop_addr      = data_buf_stop_addrs(filter_cntr)
+    val data_buf_size           = data_buf_sizes(filter_cntr)
     val coef_buf_middle_addr    = coef_buf_middle_addrs(filter_cntr)
     val coef_buf_stop_addr      = coef_buf_stop_addrs(filter_cntr)
     val filter_is_halfband      = filter_is_halfbands(filter_cntr)
@@ -272,7 +277,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
             .elsewhen(filter_is_halfband){
                 data_buf_rd_ptr       := (data_buf_rd_ptr === data_buf_stop_addr)    ? (data_buf_start_addr + 1)  |
                                          ((data_buf_rd_ptr === data_buf_stop_addr-1) ?  data_buf_start_addr       | 
-                                                                                          (data_buf_rd_ptr + 2))
+                                                                                       (data_buf_rd_ptr + 2))
             }
             .otherwise{
                 data_buf_rd_ptr       := (data_buf_rd_ptr === data_buf_stop_addr)   ? data_buf_start_addr | data_buf_rd_ptr + 1
@@ -288,7 +293,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
                 // Last element of the filter. 
 
                 // Increase start of input data buffer for current filter by <decimation ratio>
-                data_buf_rd_start_ptr   := ((data_buf_rd_start_ptr_p_decim > data_buf_stop_addr) ? (data_buf_rd_start_ptr_p_decim - data_buf_stop_addr + data_buf_start_addr) 
+                data_buf_rd_start_ptr   := ((data_buf_rd_start_ptr_p_decim > data_buf_stop_addr) ? (data_buf_rd_start_ptr_p_decim - data_buf_size) 
                                                                                                  |  data_buf_rd_start_ptr_p_decim).resize(conf.nrMemAddrBits)
 
 
@@ -400,8 +405,6 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
     io.data_in.ready    := False
 
-    //val data_buf_wr_ptr_0_incr = (data_buf_wr_ptrs(0) === data_buf_stop_addr) ? data_buf_start_addr | data_buf_wr_ptrs(0) + 1
-
     when(fir_mem_wr_en_final && !fir_mem_wr_data_is_output_final){
         mem_wr_en           := fir_mem_wr_en_final
         mem_wr_addr         := fir_mem_wr_addr_final
@@ -436,7 +439,7 @@ object FirEngineTopVerilogSyn {
                 firs += FirFilterInfo("FIR1",  64, false, 2, Array[Int](1,2,3)) 
                 firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
             }
-            else if (true){
+            else if (false){
                 firs += FirFilterInfo("HB1", 25, true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
                 firs += FirFilterInfo("HB2", 27, true, 2, Array[Int](94,-723,3032,-9781,40145,65535,40145,-9781,3032,-723,94))
                 firs += FirFilterInfo("FIR", 62, false, 1, Array[Int](-14,-50,-84,-49,117,349,423,108,-518,-932,-518,737,1854,1476,
@@ -447,8 +450,7 @@ object FirEngineTopVerilogSyn {
 
             }
             else{
-                firs += FirFilterInfo("FIR1",  20, false,  1, Array[Int](131071)) 
-                firs += FirFilterInfo("FIR2",  20, false,  1, Array[Int](131071)) 
+                firs += FirFilterInfo("FIR1",  5, false,  1, Array[Int](131071)) 
             }
             
 
