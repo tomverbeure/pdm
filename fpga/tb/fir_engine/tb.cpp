@@ -180,13 +180,24 @@ int main(int argc, char **argv)
 
     int input_sample_nr = 0;
 
-    for(int i=0;i<100000;++i){
+    bool end_of_sim = false;
+    int cycle_cntr = 0;
+    int samples_before_done = -1;
+    while(!end_of_sim){
         
-        if (i % cycles_between_samples == 5){
+        if (cycle_cntr % cycles_between_samples == 5){
             valid_value     = 1;
 
             if (data_in_file){
-                fscanf(data_in_file, "%d", &payload_value);
+                if (samples_before_done < 0){
+                    int result = fscanf(data_in_file, "%d", &payload_value);
+                    if (result == EOF){
+                        samples_before_done = 200;
+                    }
+                }
+                else{
+                    --samples_before_done;
+                }
             }
             else{
                 if (input_sample_nr == 200)
@@ -221,17 +232,25 @@ int main(int argc, char **argv)
         top.step();
 
         if (dump_level >=1)
-            vcd.sample(i*2 + 0);
+            vcd.sample(cycle_cntr*2 + 0);
 
         top.p_clk.set<bool>(true);
         top.step();
 
         if (dump_level >= 1){
-            vcd.sample(i*2 + 1);
+            vcd.sample(cycle_cntr*2 + 1);
 
             waves << vcd.buffer;
             vcd.buffer.clear();
         }
+
+        if (!data_in_file){
+            end_of_sim = cycle_cntr == 100000;
+        }
+        else{
+            end_of_sim = samples_before_done == 0;
+        }
+        ++cycle_cntr;
     }
 }
 
