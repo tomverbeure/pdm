@@ -19,3 +19,6 @@ sim: submodule sw
 sim_spdif:
 	sbt "runMain pdm.SpdifVerilogSim"
 
+fir:
+	sbt "runMain pdm.FirEngineTopVerilogSyn"
+
