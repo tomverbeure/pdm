@@ -12,7 +12,7 @@ from matplotlib.ticker import EngFormatter
 import os
 
 fs_in   = 48000 * 4
-N       = 100000
+N       = 50000
 
 x = np.linspace(0.0, N/fs_in, N)
 
@@ -41,10 +41,7 @@ def plot_signal(x, y, fs, filename):
     freqs = fftfreq(N)
     x_mask = freqs >= 0
 
-    plt.figure(figsize=(10,9))
-    plt.subplot(2,1,1)
-
-    fig, (plt_y, plt_Y) = plt.subplots(2)
+    fig, (plt_y, plt_Y) = plt.subplots(2, figsize=[10,8])
 
     plt_y.plot(x[0:200], y[0:200])
     plt_y.grid(True)
