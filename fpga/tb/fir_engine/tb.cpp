@@ -3,6 +3,10 @@
 #include <fstream>
 #include <iomanip>
 
+#include <unistd.h>
+#include <string.h>
+#include <stdio.h>
+
 #include <backends/cxxrtl/cxxrtl_vcd.h>
 
 #include "FirEngine.cpp"
@@ -62,28 +66,78 @@ filter_info_t fir_info = {
 
 filter_info_t firs[] = { hb1_info, hb2_info, fir_info };
 
+void print_help()
+{
+    fprintf(stderr, "tb [-h] [-d <dump level>] [-v <vcd file>] [-c <cycles between input samples>] [-i <data input file>] [-o <data output file>]\n"
+                    "Default values:\n"
+                    "   dump level: 0 (no waves)\n"
+                    "   vcd file: waves.vcd\n"
+                    "   cycles between input samples: 50\n"
+                    "   data input file: none\n"
+                    "   data output file: stdout\n"
+                    "\n"
+                    );
+}
+
+char default_vcd_filename[] = "waves.vcd";
 
 int main(int argc, char **argv)
 {
-    char *filename;
     int dump_level = 0;
+    char *vcd_filename;
+    int cycles_between_samples = 50;
+    char *data_in_filename = NULL;
+    char *data_out_filename = NULL;
+    FILE *data_in_file = NULL;
+    FILE *data_out_file = NULL;
 
-    // <executable> <debug level> <vcd filename> 
-    // debug level:
-    // 0 -> No dumping, no save/restore
-    // 1 -> dump everything
-    // 2 -> dump everything except memories
-    // 3 -> dump custom (only wires)
-    // 4 -> save to checkpoint
-    // 5 -> restore from checkpoint
+    int c;
+    opterr = 0;
 
-    if (argc >= 2){
-        dump_level = atoi(argv[1]);
+    vcd_filename = &default_vcd_filename[0];
+
+    while ((c = getopt(argc, argv, "hd:v:c:i:o:")) != -1){
+        switch(c){
+            case 'h':
+                print_help();
+                exit(1);
+                break;
+            case 'd':
+                dump_level = atoi(optarg);
+                break;
+            case 'v': 
+                vcd_filename = optarg;
+                break;
+            case 'c':
+                cycles_between_samples = atoi(optarg);
+                break;
+            case 'i':
+                data_in_filename = (char *)malloc(strlen(optarg)+1);
+                strcpy(data_in_filename, optarg);
+                data_in_file = fopen(data_in_filename, "rt+");
+                break;
+            case 'o':
+                data_out_filename = (char *)malloc(strlen(optarg)+1);
+                strcpy(data_out_filename, optarg);
+                data_out_file = fopen(data_out_filename, "wt+");
+                break;
+            case '?': 
+                if (optopt == 'd' || optopt == 'v'){
+                    fprintf(stderr, "Option -%c requires an argument.\n", optopt);
+                }
+                else if (isprint(optopt)){
+                    fprintf(stderr, "Unknown option `-%c`.\n", optopt);
+                }
+                else{
+                    fprintf(stderr, "Unknown option character `\\x%x'.\n", optopt);
+                }
+                return 1;
+            default: 
+                print_help();
+                abort();
+                break;
+        }
     }
-
-    if (argc >= 3){
-        filename = argv[2];
-    } 
 
     cxxrtl_design::p_FirEngine top;
     cxxrtl::debug_items all_debug_items;
@@ -91,17 +145,10 @@ int main(int argc, char **argv)
     cxxrtl::vcd_writer vcd;
     std::ofstream waves;
 
-    if (dump_level >=1 && dump_level <= 3){
+    if (dump_level >= 1){
         vcd.timescale(1, "us");
-        if (dump_level == 1)
-            vcd.add(all_debug_items);
-        else if (dump_level == 2)
-            vcd.add_without_memories(all_debug_items);
-        else if (dump_level == 3)
-		    vcd.template add(all_debug_items, [](const std::string &, const debug_item &item) {
-			    return item.type == debug_item::WIRE;
-		    });
-        waves.open(filename);
+        vcd.add_without_memories(all_debug_items);
+        waves.open(vcd_filename);
     }
 
 
@@ -109,14 +156,14 @@ int main(int argc, char **argv)
     top.p_reset.set<bool>(true);
     top.step();
 
-    if (dump_level >=1 && dump_level <= 3)
+    if (dump_level >=1)
         vcd.sample(0);
 
     top.p_clk.set<bool>(true);
     top.p_reset.set<bool>(true);
     top.step();
 
-    if (dump_level >=1 && dump_level <= 3)
+    if (dump_level >=1)
         vcd.sample(0);
     
     top.p_reset.set<bool>(false);
@@ -135,13 +182,20 @@ int main(int argc, char **argv)
 
     for(int i=0;i<100000;++i){
         
-        if (i%42 == 10){
+        if (i % cycles_between_samples == 5){
             valid_value     = 1;
-            if (input_sample_nr == 200)
-                payload_value = 32767;
-            else
-                payload_value = 0;
-            ++input_sample_nr;
+
+            if (data_in_file){
+                fscanf(data_in_file, "%d", &payload_value);
+            }
+            else{
+                if (input_sample_nr == 200)
+                    payload_value = 32767;
+                else
+                    payload_value = 0;
+                ++input_sample_nr;
+            }
+
 
             *io_data_in_valid.curr      = valid_value;
             *io_data_in_payload.curr    = payload_value;
@@ -152,23 +206,29 @@ int main(int argc, char **argv)
         }
 
         if (*io_data_out_valid.curr == 1){
-            printf("data_out: %d\n", *io_data_out_payload.curr);
+            int16_t data_out = (*io_data_out_payload.curr);
+
+            if (data_out_file){
+                fprintf(data_out_file, "%d\n", data_out);
+            }
+            else{
+                printf("%d\n", data_out);
+            }
         }
 
 
         top.p_clk.set<bool>(false);
         top.step();
 
-        if (dump_level >=1 && dump_level <= 3)
+        if (dump_level >=1)
             vcd.sample(i*2 + 0);
 
         top.p_clk.set<bool>(true);
         top.step();
 
-        if (dump_level >= 1 && dump_level <= 3)
+        if (dump_level >= 1){
             vcd.sample(i*2 + 1);
 
-        if (dump_level >= 1 && dump_level <= 3){
             waves << vcd.buffer;
             vcd.buffer.clear();
         }

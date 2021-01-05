@@ -99,7 +99,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
 {
     val io = new Bundle {
         val data_in           = slave(Stream(SInt(conf.nrDataBits bits)))
-        val data_out          = master(Stream(SInt(conf.nrDataBits bits)))
+        val data_out          = master(Flow(SInt(conf.nrDataBits bits)))
 
         val branch_nr         = out UInt(5 bits)
     }
@@ -367,16 +367,21 @@ class FirEngine(conf: FirEngineConfig) extends Component
     val fir_mem_wr_data_is_output_final  = Delay(fir_mem_wr_data_is_output_p0, 4)
     val fir_mem_wr_data_final            = (accum_p4 >> (conf.nrCoefBits-1)).resize(conf.nrDataBits)
 
-    io.data_out.valid     := False
-    io.data_out.payload   := 0      // FIXME: make permanent assigment to accum
+    val data_out_valid    = Reg(Bool) init(False)
+    val data_out_payload  = Reg(SInt(conf.nrDataBits bits)) init(0)
+
+    data_out_valid     := False
     when(fir_mem_wr_en_final){
         accum_p4              := 0
 
         when(fir_mem_wr_data_is_output_final){
-            io.data_out.valid     := True
-            io.data_out.payload   := fir_mem_wr_data_final
+            data_out_valid     := True
+            data_out_payload   := fir_mem_wr_data_final
         }
     }
+
+    io.data_out.valid   := data_out_valid
+    io.data_out.payload := data_out_payload
 
     //============================================================
     // Save to mem
@@ -431,7 +436,7 @@ object FirEngineTopVerilogSyn {
                 firs += FirFilterInfo("FIR1",  64, false, 2, Array[Int](1,2,3)) 
                 firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
             }
-            else if (false){
+            else if (true){
                 firs += FirFilterInfo("HB1", 25, true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
                 firs += FirFilterInfo("HB2", 27, true, 2, Array[Int](94,-723,3032,-9781,40145,65535,40145,-9781,3032,-723,94))
                 firs += FirFilterInfo("FIR", 62, false, 1, Array[Int](-14,-50,-84,-49,117,349,423,108,-518,-932,-518,737,1854,1476,

@@ -243,7 +243,6 @@ class PdmTestTop() extends Component
         val u_fir_engine = new FirEngine(conf)
         u_fir_engine.io.data_in.valid     := False
         u_fir_engine.io.data_in.payload   := 0
-        u_fir_engine.io.data_out.ready    := True
     }
 
     //============================================================
