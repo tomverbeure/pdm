@@ -8,12 +8,14 @@ import spinal.lib._
 
 case class FirFilterInfo( 
         name                : String, 
-        dataBufSize         : Int, 
         isHalfBand          : Boolean,
         decimationRatio     : Int,
-        coefs               : Array[Int]
+        coefs               : Array[Int],
+        forcedDataBufSize   : Int = -1 
     )
 {
+    def nrTaps      = if (isHalfBand) 2*(coefs.length-1)-1 else coefs.length
+    def dataBufSize = if (forcedDataBufSize > 0) forcedDataBufSize else nrTaps + decimationRatio
 }
 
 case class FirFilterFixedInfoHW(conf: FirEngineConfig, idx: Int) extends Bundle 
@@ -41,9 +43,11 @@ case class FirEngineConfig(
           nrCoefBits    : Int
     )
 {
-    // Coefficients are tightly packed one after the other in RAM,
-    // so simply add length of each coefficient array together.
+
+    // Number of coefficients of all filters added together
     def totalNrCoefs          = filters.foldLeft(0){_ + _.coefs.length}
+
+    // Maximum number of coefficients
     def maxNrCoefs            = filters.foldLeft(0)((m,f) => ( if (f.coefs.size > m) f.coefs.size else m ))
 
     def maxDataBufAddr        = dataBufStopAddrs.foldLeft(0)((m,f) => ( if (f > m) f else m ))
@@ -57,8 +61,6 @@ case class FirEngineConfig(
 
     def maxDecimationRatio    = filters.foldLeft(0)((m,f) => ( if (f.decimationRatio > m) f.decimationRatio else m ))
     def totalDecimationRatio  = filters.foldLeft(1){ _ * _.decimationRatio } 
-
-    def filterOrders          = filters.scanLeft(0)((m,f) => ( if (f.isHalfBand) (f.coefs.length-1)*2 else f.coefs.length-1 )).drop(1)
 
 /*
     FIXME: these 2 don't work due to some conflict between Scala and SpinalHDL
@@ -143,7 +145,7 @@ class FirEngine(conf: FirEngineConfig) extends Component
     // Fixed config values
     val data_buf_start_addrs    = Vec(UInt(conf.nrMemAddrBits bits),          conf.filters.size)
     val data_buf_stop_addrs     = Vec(UInt(conf.nrMemAddrBits bits),          conf.filters.size)
-    val data_buf_sizes          = Vec(UInt(log2Up(conf.maxDataBufSize) bits), conf.filters.size)
+    val data_buf_sizes          = Vec(UInt(log2Up(conf.maxDataBufSize+1) bits), conf.filters.size)
 
     val coef_buf_start_addrs    = Vec(UInt(conf.nrMemAddrBits bits), conf.filters.size)
     val coef_buf_middle_addrs   = Vec(UInt(conf.nrMemAddrBits bits), conf.filters.size)
@@ -234,8 +236,8 @@ class FirEngine(conf: FirEngineConfig) extends Component
     switch(cur_state){
         is(FsmState.Config){
             for ((filter, i) <- conf.filters.zipWithIndex){
-                data_buf_rd_start_ptrs(i)  := conf.dataBufStartAddrs(i)                            + conf.totalNrCoefs
-                data_buf_wr_ptrs(i)        := conf.dataBufStartAddrs(i) + conf.filterOrders(i) + 2 + conf.totalNrCoefs
+                data_buf_rd_start_ptrs(i)  := conf.dataBufStartAddrs(i)                 + conf.totalNrCoefs
+                data_buf_wr_ptrs(i)        := conf.dataBufStartAddrs(i) + filter.nrTaps + conf.totalNrCoefs
                 nr_new_inputs(i)           := 0 
             }
 
@@ -434,15 +436,15 @@ object FirEngineTopVerilogSyn {
             val firs = ArrayBuffer[FirFilterInfo]()
     
             if (false){
-                firs += FirFilterInfo("HB1",  256, true,  2, Array[Int](1,2,3,4,5,6,7,8,9)) 
-                firs += FirFilterInfo("HB2",   64, true,  4, Array[Int](1,2,3,4,5)) 
-                firs += FirFilterInfo("FIR1",  64, false, 2, Array[Int](1,2,3)) 
-                firs += FirFilterInfo("FIR2",  64, false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10)) 
+                firs += FirFilterInfo("HB1",  true,  2, Array[Int](1,2,3,4,5,6,7,8,9), 256) 
+                firs += FirFilterInfo("HB2",  true,  4, Array[Int](1,2,3,4,5), 64) 
+                firs += FirFilterInfo("FIR1", false, 2, Array[Int](1,2,3), 64) 
+                firs += FirFilterInfo("FIR2", false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10), 64) 
             }
             else if (true){
-                firs += FirFilterInfo("HB1", 25, true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
-                firs += FirFilterInfo("HB2", 27, true, 2, Array[Int](94,-723,3032,-9781,40145,65535,40145,-9781,3032,-723,94))
-                firs += FirFilterInfo("FIR", 62, false, 1, Array[Int](-14,-50,-84,-49,117,349,423,108,-518,-932,-518,737,1854,1476,
+                firs += FirFilterInfo("HB1", true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
+                firs += FirFilterInfo("HB2", true, 2, Array[Int](94,-723,3032,-9781,40145,65535,40145,-9781,3032,-723,94))
+                firs += FirFilterInfo("FIR", false, 1, Array[Int](-14,-50,-84,-49,117,349,423,108,-518,-932,-518,737,1854,1476,
                                                                       -738,-3193,-3245,293,5148,6520,1184,-8322,-13605,-5839,16758,
                                                                       45494,65535,65535,45494,16758,-5839,-13605,-8322,1184,6520,5148,
                                                                       293,-3245,-3193,-738,1476,1854,737,-518,-932,-518,108,423,
@@ -450,7 +452,7 @@ object FirEngineTopVerilogSyn {
 
             }
             else{
-                firs += FirFilterInfo("FIR1",  5, false,  1, Array[Int](131071)) 
+                firs += FirFilterInfo("FIR1", false,  1, Array[Int](131071), 5) 
             }
             
 
@@ -460,7 +462,14 @@ object FirEngineTopVerilogSyn {
                 18
             )
 
-            conf.filterOrders.foreach { printf("order: %d\n", _) }
+          conf.filters.foreach((f) => { 
+                printf("name: %s\n", f.name) 
+                printf("    isHalfBand       : %d\n", if (f.isHalfBand) 1 else 0) 
+                printf("    taps             : %d\n", f.nrTaps) 
+                printf("    nr coefs         : %d\n", f.coefs.length) 
+                printf("    decimation ratio : %d\n", f.decimationRatio) 
+                printf("    data buf size    : %d\n", f.dataBufSize) 
+          })
 
             val toplevel = new FirEngine(conf)
             toplevel
