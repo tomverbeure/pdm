@@ -9,10 +9,10 @@ from matplotlib.ticker import EngFormatter
 from scipy import signal
 from filter_lib import *
 
-import json
-
-plot_combined_freq_response         = False
-plot_reduced_bits                   = True
+common                              = True
+plot_combined_freq_response         = True
+plot_combined_freq_response_alt     = False
+plot_reduced_bits                   = False
 
 save_blog = False
 
@@ -52,7 +52,8 @@ a_sb    = 89
 
 total_decim = f_pdm//f_out
 
-if plot_combined_freq_response:
+if common:
+
 
     # If we make the length of H a multiple of the total decimation rate, we can
     # easily slice and dice them into all the factors of the decimation.
@@ -66,12 +67,12 @@ if plot_combined_freq_response:
     cic_order       = 4
 
 
-    h_cic = cic_filter(cic_decim, cic_order)
-    h_cic_stats = FilterStats(h_cic, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = H_size)
-    cic_w, cic_H = signal.freqz(h_cic, worN = H_size)
+    cic_h = cic_filter(cic_decim, cic_order)
+    cic_stats = FilterStats(cic_h, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = H_size)
+    cic_w, cic_H = signal.freqz(cic_h, worN = H_size)
 
-    cic_pb_attn = h_cic_stats.attn_at(f_pb)
-    cic_sb_attn = h_cic_stats.attn_at(2*(f_pdm/2/cic_decim) - f_sb)
+    cic_pb_attn = cic_stats.attn_at(f_pb)
+    cic_sb_attn = cic_stats.attn_at(2*(f_pdm/2/cic_decim) - f_sb)
 
     decim_remain    = (f_pdm//cic_decim) // f_out
     f_s_remain      = f_pdm//cic_decim
@@ -83,6 +84,7 @@ if plot_combined_freq_response:
 
     hb1_N = half_band_find_optimal_N(f_s_remain, f_sb, pb_attn_remain, a_sb, verbose = False)
     (hb1_h, hb1_w, hb1_H, hb1_Rpb, hb1_Rsb, hb1_Hpb_min, hb1_Hpb_max, hb1_Hsb_max) = half_band_calc_filter(f_s_remain, f_sb, order = hb1_N, H_nr_points = H_size)
+    print("HB1 coeffs: %d" % len(hb1_h))
 
     decim_remain //= 2
     f_s_remain //= 2
@@ -95,6 +97,8 @@ if plot_combined_freq_response:
     hb2_N = half_band_find_optimal_N(f_s_remain, f_sb, pb_attn_remain, a_sb, verbose = False)
     (hb2_h, hb2_w, hb2_H, hb2_Rpb, hb2_Rsb, hb2_Hpb_min, hb2_Hpb_max, hb2_Hsb_max) = half_band_calc_filter(f_s_remain, f_sb, order = hb2_N, H_nr_points = H_size)
 
+    print("HB2 coeffs: %d" % len(hb2_h))
+
     decim_remain //= 2
     f_s_remain //= 2
     pb_attn_remain -= abs(dB20(hb2_Rpb))
@@ -103,12 +107,14 @@ if plot_combined_freq_response:
     # FIR Filter
     #============================================================
 
-    fir_N = fir_find_optimal_N(f_s_remain, f_pb, f_sb, pb_attn_remain, a_sb, verbose = False)
+    fir_N = fir_find_optimal_N(f_s_remain, f_pb, f_sb, pb_attn_remain, a_sb, H_nr_points = H_size, verbose = False)
     (fir_h, fir_w, fir_H, fir_Rpb, fir_Rsb, fir_Hpb_min, fir_Hpb_max, fir_Hsb_max) = fir_calc_filter(f_s_remain, f_pb, f_sb, pb_attn_remain, a_sb, order = fir_N, H_nr_points = H_size)
 
+    print("FIR coeffs: %d" % len(fir_h))
 
+if plot_combined_freq_response:
     #============================================================
-    # 
+    # Plot everything
     #============================================================
 
     hb1_H_no_decim  = H_unfold(hb1_H, 12)[::12]
@@ -248,6 +254,121 @@ if plot_combined_freq_response:
     plt.tight_layout()
     plt.savefig("pdm_pcm2rtl_joint_filters_after_decimation.svg")
     if save_blog: plt.savefig(BLOG_PATH + "pdm_pcm2rtl_joint_filters_after_decimation.svg")
+
+if plot_combined_freq_response_alt:
+    #============================================================
+    # Calcualte H for different stages by h interpolation and convolation
+    # instead of H unfolding and multiplication
+    #============================================================
+
+    cic_hb1_h           = np.convolve(cic_h, interpolate_zeros(hb1_h, 12))
+    cic_hb1_hb2_h       = np.convolve(cic_hb1_h, interpolate_zeros(hb2_h, 24))
+    cic_hb1_hb2_fir_h   = np.convolve(cic_hb1_hb2_h, interpolate_zeros(fir_h, 48))
+
+    cic_stats = FilterStats(cic_h, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = H_size)
+    cic_w, cic_H = signal.freqz(cic_h, worN = H_size)
+
+    cic_hb1_stats = FilterStats(cic_hb1_h, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = H_size)
+    cic_hb1_w, cic_hb1_H = signal.freqz(cic_hb1_h, worN = H_size)
+
+    cic_hb1_hb2_stats = FilterStats(cic_hb1_hb2_h, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = H_size)
+    cic_hb1_hb2_w, cic_hb1_hb2_H = signal.freqz(cic_hb1_hb2_h, worN = H_size)
+
+    cic_hb1_hb2_fir_stats = FilterStats(cic_hb1_hb2_fir_h, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = H_size)
+    cic_hb1_hb2_fir_w, cic_hb1_hb2_fir_H = signal.freqz(cic_hb1_hb2_fir_h, worN = H_size)
+
+    #============================================================
+    # Plot everything
+    #============================================================
+
+    plt.figure(figsize=(10, 12))
+
+    # ============================================================
+    # CIC
+    plt.subplot(4,2,1)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-130, 5])
+    plt.gca().set_title("CIC Filter")
+    plt.xlabel("Frequency")
+    plt.ylabel("Attenuation (dB)")
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
+    plt.plot(cic_w/np.pi/2*f_pdm, dB20(np.abs(cic_H)))
+
+    plt.subplot(4,2,2)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-260, 5])
+    plt.gca().set_title("CIC Filter")
+    plt.xlabel("Frequency")
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
+    plt.plot(cic_w/np.pi/2*f_pdm, dB20(np.abs(cic_H)))
+
+    # ============================================================
+    # HB1
+    plt.subplot(4,2,3)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-130, 5])
+    plt.gca().set_title("HB1 Filter")
+    plt.xlabel("Frequency")
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
+    plt.plot(cic_w/np.pi/2*f_pdm/12, dB20(np.abs(hb1_H)))
+
+    plt.subplot(4,2,4)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-260, 5])
+    plt.gca().set_title("CIC + HB1 Filter")
+    plt.xlabel("Frequency")
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
+    plt.plot(cic_w/np.pi/2*f_pdm, dB20(np.abs(cic_hb1_H)))
+
+    # ============================================================
+    # HB2
+    plt.subplot(4,2,5)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-130, 5])
+    plt.gca().set_title("HB2 Filter")
+    plt.xlabel("Frequency")
+    plt.ylabel("Attenuation (dB)")
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
+    plt.plot(cic_w/np.pi/2*f_pdm/24, dB20(np.abs(hb2_H)))
+
+    plt.subplot(4,2,6)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-260, 5])
+    plt.gca().set_title("CIC + HB1 + HB2 Filter")
+    plt.xlabel("Frequency")
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
+    plt.plot(cic_w/np.pi/2*f_pdm, dB20(np.abs(cic_hb1_hb2_H)))
+
+    # ============================================================
+    # FIR
+    plt.subplot(4,2,7)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-130, 5])
+    plt.gca().set_title("FIR Filter")
+    plt.xlabel("Frequency")
+    plt.ylabel("Attenuation (dB)")
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
+    plt.plot(cic_w/np.pi/2*f_pdm/48, dB20(np.abs(fir_H)))
+
+    plt.subplot(4,2,8)
+    plt.grid(True)
+    plt.gca().set_xlim([0.0, f_pdm/2])
+    plt.gca().set_ylim([-260, 5])
+    plt.gca().set_title("CIC + HB1 + HB2 + FIR Filter")
+    plt.xlabel("Frequency")
+    plt.gca().get_xaxis().set_major_formatter(EngFormatter(unit="Hz"))
+    plt.plot(cic_w/np.pi/2*f_pdm, dB20(np.abs(cic_hb1_hb2_fir_H)))
+
+    plt.tight_layout()
+    plt.savefig("pdm_pcm2rtl_joint_filters_alt.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "pdm_pcm2rtl_joint_filters_alt.svg")
 
 if plot_reduced_bits:
 
@@ -266,12 +387,12 @@ if plot_reduced_bits:
     cic_order       = 4
 
 
-    h_cic = cic_filter(cic_decim, cic_order)
-    h_cic_stats = FilterStats(h_cic, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = H_size)
-    cic_w, cic_H = signal.freqz(h_cic, worN = H_size)
+    cic_h = cic_filter(cic_decim, cic_order)
+    cic_stats = FilterStats(cic_h, fsample = f_pdm, fcutoff = f_pb, fstop = f_sb, N = H_size)
+    cic_w, cic_H = signal.freqz(cic_h, worN = H_size)
 
-    cic_pb_attn = h_cic_stats.attn_at(f_pb)
-    cic_sb_attn = h_cic_stats.attn_at(2*(f_pdm/2/cic_decim) - f_sb)
+    cic_pb_attn = cic_stats.attn_at(f_pb)
+    cic_sb_attn = cic_stats.attn_at(2*(f_pdm/2/cic_decim) - f_sb)
 
     decim_remain    = (f_pdm//cic_decim) // f_out
     f_s_remain      = f_pdm//cic_decim
@@ -284,6 +405,8 @@ if plot_reduced_bits:
     hb1_N = half_band_find_optimal_N(f_s_remain, f_sb, pb_attn_remain, a_sb, verbose = False)
     (hb1_h, hb1_w, hb1_H, hb1_Rpb, hb1_Rsb, hb1_Hpb_min, hb1_Hpb_max, hb1_Hsb_max) = half_band_calc_filter(f_s_remain, f_sb, order = hb1_N, coef_bits = coef_bits, H_nr_points = H_size)
 
+    print("HB1 coeffs: %d" % len(hb1_h))
+
     decim_remain //= 2
     f_s_remain //= 2
     pb_attn_remain -= abs(dB20(hb1_Rpb))
@@ -295,6 +418,8 @@ if plot_reduced_bits:
     hb2_N = half_band_find_optimal_N(f_s_remain, f_sb, pb_attn_remain, a_sb, verbose = False)
     (hb2_h, hb2_w, hb2_H, hb2_Rpb, hb2_Rsb, hb2_Hpb_min, hb2_Hpb_max, hb2_Hsb_max) = half_band_calc_filter(f_s_remain, f_sb, order = hb2_N, coef_bits = coef_bits, H_nr_points = H_size)
 
+    print("HB2 coeffs: %d" % len(hb2_h))
+
     decim_remain //= 2
     f_s_remain //= 2
     pb_attn_remain -= abs(dB20(hb2_Rpb))
@@ -303,8 +428,10 @@ if plot_reduced_bits:
     # FIR Filter
     #============================================================
 
-    fir_N = fir_find_optimal_N(f_s_remain, f_pb, f_sb, pb_attn_remain, a_sb, H_nr_points = H_size, verbose = True)
+    fir_N = fir_find_optimal_N(f_s_remain, f_pb, f_sb, pb_attn_remain, a_sb, H_nr_points = H_size, verbose = False)
     (fir_h, fir_w, fir_H, fir_Rpb, fir_Rsb, fir_Hpb_min, fir_Hpb_max, fir_Hsb_max) = fir_calc_filter(f_s_remain, f_pb, f_sb, pb_attn_remain, a_sb, order = fir_N, coef_bits = coef_bits, H_nr_points = H_size)
+
+    print("FIR coeffs: %d" % len(fir_h))
 
 
     #============================================================
@@ -446,8 +573,8 @@ if plot_reduced_bits:
 
 
     plt.tight_layout()
-    plt.savefig("pdm_pcm2rtl_joint_filters_after_decimation.svg")
-    if save_blog: plt.savefig(BLOG_PATH + "pdm_pcm2rtl_joint_filters_after_decimation.svg")
+    plt.savefig("pdm_pcm2rtl_joint_filters_after_decimation_quantized.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "pdm_pcm2rtl_joint_filters_after_decimation_quantized.svg")
 
     #============================================================
     # Write all filter parameters are json 
