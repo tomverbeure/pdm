@@ -363,6 +363,12 @@ def H_unfold(Hin, ratio):
 
     return Hout
 
+def interpolate_zeros(h_in, ratio = 1):
+
+    h_out = np.zeros(ratio * len(h_in) -1)
+    h_out[::ratio] = h_in
+
+    return h_out
 
 def plot_freq_response(w, H, Fs, Fpb, Fsb, Hpb_min, Hpb_max, Hsb_max, Ylim_min = -90):
     plt.title("Frequency Reponse")

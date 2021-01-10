@@ -9,10 +9,12 @@ from matplotlib.ticker import EngFormatter
 from scipy import signal
 from filter_lib import *
 
+import json
+
 common                              = True
 plot_combined_freq_response         = True
-plot_combined_freq_response_alt     = False
-plot_reduced_bits                   = False
+plot_combined_freq_response_alt     = True
+plot_reduced_bits                   = True
 
 save_blog = False
 
