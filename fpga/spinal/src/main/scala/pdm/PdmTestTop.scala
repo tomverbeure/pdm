@@ -13,7 +13,7 @@ import spinal.lib.com.i2c._
 
 import max10._
 
-class PdmTestTop() extends Component 
+class PdmTestTop(isSim: Boolean) extends Component 
 {
     val io = new Bundle {
 
@@ -23,47 +23,59 @@ class PdmTestTop() extends Component
         val pdm_sel         = out(Bool)
         val pdm_dat         = in(Bool)
 
-        val led0            = out(Bool)
-        val led1            = out(Bool)
-        val led2            = out(Bool)
-        val led3            = out(Bool)
-        val led4            = out(Bool)
+        val spdif_out       = out(Bool)
 
+        val led0            = out(Bool)
     }
 
     io.pdm_sel    := False
-    io.led3       := True
 
     noIoPrefix()
 
+    // Clock architecture:
+    // osc_clk_in (50MHz or 25MHz depending on source) -> PLL -> 18.432 MHz = clk_audio_max
+    // 18.432MHz / 8 = 2.304 MHz: clk_pdm:   goes to output as and drives the CIC filter
+    // 18.432MHz / 3 = 6.144 MHz: clk_spdif: drives the SPDIF output interface, which needs a clock 
+    //                                       that's 128x higher than the sample rate
+    // osc_clk_in (50MHz or 25MHz depending on source) -> PLL -> 92.16 MHz = clk_calc
+    //                      drives the FIR filter
+    // osc_clk_in (50MHz or 25MHz depending on source) -> PLL -> 46.08 MHz = clk_cpu
+
+    val clk_audio_max = Bool
     val clk_pdm       = Bool
     val clk_cpu       = Bool
     val clk_calc      = Bool
     val clk_spdif     = Bool
 
-    val u_pll = new pll()
-    u_pll.io.inclk0          <> io.osc_clk_in
-    u_pll.io.c0              <> clk_pdm    
-    u_pll.io.c1              <> clk_cpu    
-    u_pll.io.c2              <> clk_calc    
-    u_pll.io.c3              <> clk_spdif    
+    if (isSim) new Area {
+        clk_audio_max := io.osc_clk_in
+        clk_calc      := io.osc_clk_in
+        clk_cpu       := io.osc_clk_in
+    }
+    else{
 
+        val u_pll = new pll()
+        u_pll.io.inclk0          <> io.osc_clk_in
+        u_pll.io.c0              <> clk_audio_max       // 18.432 MHz
+        u_pll.io.c1              <> clk_calc            // 92.16 Mhz
+        u_pll.io.c2              <> clk_cpu             // 46.08 MHz
+    }
 
     //============================================================
-    // Create clk pdm 
+    // Create clk audio max 
     //============================================================
-    
-    val clkPdmRawDomain = ClockDomain(
-        clock       = clk_pdm,
-        frequency   = FixedFrequency(2.4 MHz),
+
+    val clkAudioMaxRawDomain = ClockDomain(
+        clock       = clk_audio_max,
+        frequency   = FixedFrequency(18.432 MHz),
         config      = ClockDomainConfig(
             resetKind = BOOT
         )
     )
 
-    val clk_pdm_reset_  = Bool
+    val clk_audio_max_reset_  = Bool
 
-    val clk_pdm_reset_gen = new ClockingArea(clkPdmRawDomain) {
+    val clk_audio_max_reset_gen = new ClockingArea(clkAudioMaxRawDomain) {
         val reset_unbuffered_ = True
 
         val reset_cntr = Reg(UInt(5 bits)) init(0)
@@ -72,20 +84,81 @@ class PdmTestTop() extends Component
             reset_unbuffered_ := False
         }
 
-        clk_pdm_reset_ := RegNext(reset_unbuffered_)
+        clk_audio_max_reset_ := RegNext(reset_unbuffered_)
     }
 
-
-    val clkPdmDomain = ClockDomain(
-        clock       = clk_pdm,
-        reset       = clk_pdm_reset_,
-        frequency   = FixedFrequency(2.4 MHz),
+    val clkAudioMaxDomain = ClockDomain(
+        clock       = clk_audio_max,
+        reset       = clk_audio_max_reset_,
+        frequency   = FixedFrequency(18.432 MHz),
         config      = ClockDomainConfig(
-            resetKind = SYNC,
+            resetKind = ASYNC,
             resetActiveLevel = LOW
         )
     )
 
+    //============================================================
+    // Create clk pdm 
+    //============================================================
+
+    val clk_pdm_reset_  = Bool
+
+    val pdm_raw = new ClockingArea(clkAudioMaxDomain) {
+        val pdm_div_cntr = Counter(0, if (isSim) 15 else 7)
+        pdm_div_cntr.increment()
+        clk_pdm   := pdm_div_cntr < (if (isSim) 8 else 4)
+
+        val reset_cntr = Reg(UInt(3 bits)) init(0)
+        when(pdm_div_cntr === 0){
+            when(reset_cntr =/= U(reset_cntr.range -> true)){
+                reset_cntr := reset_cntr + 1
+            }
+        }
+        clk_pdm_reset_ := RegNext(reset_cntr === U(reset_cntr.range->true))
+    }
+    
+    val clkPdmDomain = ClockDomain(
+        clock       = clk_pdm,
+        reset       = clk_pdm_reset_,
+        frequency   = FixedFrequency(2.304 MHz),
+        config      = ClockDomainConfig(
+            resetKind = ASYNC,
+            resetActiveLevel = LOW
+        )
+    )
+
+    //============================================================
+    // Create clk spdif 
+    //============================================================
+
+    val clk_spdif_reset_  = Bool
+
+    val spdif_raw = new ClockingArea(clkAudioMaxDomain) {
+        val spdif_div_cntr = Counter(0, if (isSim) 5 else 2)
+        spdif_div_cntr.increment()
+        clk_spdif   := spdif_div_cntr < 1
+
+        val reset_cntr = Reg(UInt(3 bits)) init(0)
+        when(spdif_div_cntr === 0){
+            when(reset_cntr =/= U(reset_cntr.range -> true)){
+                reset_cntr := reset_cntr + 1
+            }
+        }
+
+        clk_spdif_reset_ := RegNext(reset_cntr === U(reset_cntr.range -> true))
+    }
+    
+    val clkSpdifDomain = ClockDomain(
+        clock       = clk_spdif,
+        reset       = clk_spdif_reset_,
+        frequency   = FixedFrequency(6.144 MHz),
+        config      = ClockDomainConfig(
+            resetKind = ASYNC,
+            resetActiveLevel = LOW
+        )
+    )
+
+    /*
     //============================================================
     // Create clk cpu 
     //============================================================
@@ -118,10 +191,11 @@ class PdmTestTop() extends Component
         reset       = clk_cpu_reset_,
         frequency   = FixedFrequency(50 MHz),
         config      = ClockDomainConfig(
-            resetKind = SYNC,
+            resetKind = ASYNC,
             resetActiveLevel = LOW
         )
     )
+    */
 
     //============================================================
     // Create clk calc 
@@ -129,7 +203,7 @@ class PdmTestTop() extends Component
     
     val clkCalcRawDomain = ClockDomain(
         clock       = clk_calc,
-        frequency   = FixedFrequency(2.4 MHz),
+        frequency   = FixedFrequency(92.16 MHz),
         config      = ClockDomainConfig(
             resetKind = BOOT
         )
@@ -153,50 +227,14 @@ class PdmTestTop() extends Component
     val clkCalcDomain = ClockDomain(
         clock       = clk_calc,
         reset       = clk_calc_reset_,
-        frequency   = FixedFrequency(2.4 MHz),
+        frequency   = FixedFrequency(92.16 MHz),
         config      = ClockDomainConfig(
-            resetKind = SYNC,
+            resetKind = ASYNC,
             resetActiveLevel = LOW
         )
     )
 
-    //============================================================
-    // Create spdif clk
-    //============================================================
-    
-    val clkSpdifRawDomain = ClockDomain(
-        clock       = clk_spdif,
-        frequency   = FixedFrequency(6.144 MHz),
-        config      = ClockDomainConfig(
-            resetKind = BOOT
-        )
-    )
-
-    val clk_spdif_reset_ = Bool
-
-    val clk_spdif_reset_gen = new ClockingArea(clkSpdifRawDomain) {
-        val reset_unbuffered_ = True
-
-        val reset_cntr = Reg(UInt(5 bits)) init(0)
-        when(reset_cntr =/= U(reset_cntr.range -> true)){
-            reset_cntr := reset_cntr + 1
-            reset_unbuffered_ := False
-        }
-
-        clk_spdif_reset_ := RegNext(reset_unbuffered_)
-    }
-
-
-    val clkSpdifDomain = ClockDomain(
-        clock       = clk_spdif,
-        reset       = clk_spdif_reset_,
-        frequency   = FixedFrequency(2.4 MHz),
-        config      = ClockDomainConfig(
-            resetKind = SYNC,
-            resetActiveLevel = LOW
-        )
-    )
-
+/*
     //============================================================
     // CPU
     //============================================================
@@ -207,6 +245,8 @@ class PdmTestTop() extends Component
         u_cpu.io.led_green      <> io.led1
         u_cpu.io.led_blue       <> io.led2
     }
+    */
+
 
     //============================================================
     // PDM
@@ -226,7 +266,7 @@ class PdmTestTop() extends Component
     //============================================================
 
 
-    val fir = new ClockingArea(clkCpuDomain) {
+    val fir = new ClockingArea(clkCalcDomain) {
 
         val firs = ArrayBuffer[FirFilterInfo]()
 
@@ -256,9 +296,11 @@ class PdmTestTop() extends Component
 
 
         val u_spdif_out = new SpdifOut(AudioIntfcConfig(maxNrChannels = 2, maxNrBitsPerSample = 16), clkDivRatio = 1)
-        u_spdif_out.io.spdif                <> io.led4
         u_spdif_out.io.audio_samples_rdy    <> calc_next_sample
         u_spdif_out.io.audio_samples        <> audio_samples
+
+        io.led0       := u_spdif_out.io.spdif
+        io.spdif_out  := u_spdif_out.io.spdif
 
         val waveform_cntr = Reg(UInt(log2Up(48) bits)) init(0)
         when(calc_next_sample){
@@ -280,7 +322,7 @@ object PdmTestTopVerilogSim {
         val config = SpinalConfig(anonymSignalUniqueness = true)
 
         config.generateVerilog({
-            val toplevel = new PdmTestTop()
+            val toplevel = new PdmTestTop(isSim = true)
             InOutWrapper(toplevel)
         })
 
@@ -292,20 +334,10 @@ object PdmTestTopVerilogSyn {
 
         val config = SpinalConfig(anonymSignalUniqueness = true)
         config.generateVerilog({
-            val toplevel = new PdmTestTop()
+            val toplevel = new PdmTestTop(isSim = false)
             InOutWrapper(toplevel)
             toplevel
         })
     }
 }
 
-//Define a custom SpinalHDL configuration with synchronous reset instead of the default asynchronous one. This configuration can be resued everywhere
-object MySpinalConfig extends SpinalConfig(defaultConfigForClockDomains = ClockDomainConfig(resetKind = SYNC))
-
-
-//Generate the MyTopLevel's Verilog using the above custom configuration.
-object PdmTestTopVerilogWithCustomConfig {
-    def main(args: Array[String]) {
-        MySpinalConfig.generateVerilog(new PdmTestTop)
-    }
-}

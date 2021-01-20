@@ -4,7 +4,7 @@ package pdm
 import spinal.core._
 import spinal.lib._
 
-class PdmFilter(nrStages: Int = 5, nrBits: Int = 30, decimation: Int = 50) extends Component 
+class PdmFilter(nrStages: Int = 4, nrBits: Int = 30, decimation: Int = 12) extends Component 
 {
     val io = new Bundle {
         val pdm_dat         = in(Bool)
