@@ -20,5 +20,5 @@ sim_spdif:
 	sbt "runMain pdm.SpdifVerilogSim"
 
 fir:
-	sbt "runMain pdm.FirEngineTopVerilogSyn"
+	sbt "runMain pdm.FirEngineTopVerilogSim"
 

@@ -425,10 +425,8 @@ class FirEngine(conf: FirEngineConfig) extends Component
 
 }
 
-object FirEngineTopVerilogSyn {
+object FirEngineTopVerilogSim {
     def main(args: Array[String]) {
-
-
 
         val config = SpinalConfig(anonymSignalUniqueness = true)
         config.generateVerilog({
@@ -442,6 +440,11 @@ object FirEngineTopVerilogSyn {
                 firs += FirFilterInfo("FIR2", false, 1, Array[Int](1,2,3,4,5,6,7,8,9,10), 64) 
             }
             else if (true){
+                // Filter coefficients are calculate by: ./modeling/pdm_pcm2rtl/pdm_pcm2rtl.py
+                // The generated files is:  ./modeling/pdm_pcm2rtl/pdm_pcm_filters.json and copied over
+                // to ./fpga/spinal/pdm_pcm_filters.json.
+                // ./fpga/spinal/filters_json2scala.py generates C data structures(!), which then manually
+                // massaged into the coefficients below...
                 firs += FirFilterInfo("HB1", true, 2, Array[Int](878,-6713,38602,65535,38602,-6713,878))
                 firs += FirFilterInfo("HB2", true, 2, Array[Int](94,-723,3032,-9781,40145,65535,40145,-9781,3032,-723,94))
                 firs += FirFilterInfo("FIR", false, 1, Array[Int](-14,-50,-84,-49,117,349,423,108,-518,-932,-518,737,1854,1476,
