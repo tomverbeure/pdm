@@ -27,7 +27,6 @@ def mov_avg_filter_psd(length = 64, order = 1, osr = None, plotStop = None, plot
     h_padded = np.zeros(N)
     h_padded[0:len(h)] = h
 
-    x = np.linspace(0., 1., N)
     H = np.fft.fft(h_padded)
 
     freqs = np.fft.fftfreq(N)
@@ -62,7 +61,7 @@ def decimation_without_filtering_regular(decimation_ratio):
 
     N=10000
 
-    x = np.linspace(0., 1., N)
+    x = np.linspace(0., 1., N, endpoint=False)
 
     freq1 = 100
     freq2 = 1000
@@ -80,9 +79,10 @@ def decimation_without_filtering_regular(decimation_ratio):
                0.08 * np.cos(4 * np.pi * n / (N - 1) * decimation_ratio)
 
     spec = np.fft.fft((y * w) /(N/4/decimation_ratio))
+    spec = np.fft.fft((y) /(N/4/decimation_ratio))
 
     plt.gca().set_xlim([0.0, N/2])
-    plt.gca().set_ylim([-70, 10])
+    plt.gca().set_ylim([-70, 15])
     plt.grid(True)
     plt.plot(N * x[:int(N/2./decimation_ratio + 1)], dB20(np.abs(spec[:int(N/2./decimation_ratio + 1)])),'b', label='Simulation')
 
