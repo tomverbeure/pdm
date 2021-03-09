@@ -23,7 +23,7 @@ import platform
 if platform.system() == "Darwin":
     BLOG_PATH = "/Users/tom/projects/tomverbeure.github.io/assets/pdm/pdm2pcm/"
 else:
-    BLOG_PATH = "/home/tom/projects/tomverbeure.github.io/assets/pdm/pdm2pcm/"
+    BLOG_PATH = "./"
 
 #============================================================
 # Overall filter requirements:
