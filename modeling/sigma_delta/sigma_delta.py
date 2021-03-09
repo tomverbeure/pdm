@@ -9,6 +9,8 @@ from scipy import signal
 from deltasigma import *
 from filter_lib import *
 
+save_blog   = False
+
 import platform
 if platform.system() == "Darwin":
     BLOG_PATH = "/Users/tom/projects/tomverbeure.github.io/assets/pdm/sigma_delta/"
@@ -198,14 +200,14 @@ if plot_quantization_noise:
 
     plt.tight_layout()
     plt.savefig("quantization_noise_8.svg")
-    plt.savefig(BLOG_PATH + "quantization_noise_8.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "quantization_noise_8.svg")
 
     plt.figure(figsize=(10,4))
     quantization_noise(256)
 
     plt.tight_layout()
     plt.savefig("quantization_noise_256.svg")
-    plt.savefig(BLOG_PATH + "quantization_noise_256.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "quantization_noise_256.svg")
 
 #============================================================
 # Sinewave to PDM example
@@ -228,7 +230,7 @@ if plot_sinewave_to_pdm:
 
     plt.tight_layout()
     plt.savefig("sinewave_to_pdm.svg")
-    plt.savefig(BLOG_PATH + "sinewave_to_pdm.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "sinewave_to_pdm.svg")
 
 #============================================================
 # Sinewave PSD example
@@ -247,7 +249,7 @@ if plot_sinewave_pdm_psd:
 
     plt.tight_layout()
     plt.savefig("sinewave_pdm_psd.svg")
-    plt.savefig(BLOG_PATH + "sinewave_pdm_psd.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "sinewave_pdm_psd.svg")
 
 #============================================================
 # Sinewave to PDM for different orders
@@ -289,7 +291,7 @@ if plot_sinewave_to_pdm_different_orders:
     plt.xlabel('Sample Number')
     plt.tight_layout()
     plt.savefig("sinewave_to_pdm_different_orders.svg")
-    plt.savefig(BLOG_PATH + "sinewave_to_pdm_different_orders.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "sinewave_to_pdm_different_orders.svg")
 
 #============================================================
 # Sinewave PSD OSR16 for different orders
@@ -331,7 +333,7 @@ if plot_sinewave_pdm_psd_different_orders:
 
     plt.tight_layout()
     plt.savefig("sinewave_pdm_psd_different_orders.svg")
-    plt.savefig(BLOG_PATH + "sinewave_pdm_psd_different_orders.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "sinewave_pdm_psd_different_orders.svg")
 
 #============================================================
 # Sinewave to PDM for different OSR
@@ -364,7 +366,7 @@ if plot_sinewave_to_pdm_different_osr:
     plt.xlabel('Sample Number')
     plt.tight_layout()
     plt.savefig("sinewave_to_pdm_different_osr.svg")
-    plt.savefig(BLOG_PATH + "sinewave_to_pdm_different_osr.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "sinewave_to_pdm_different_osr.svg")
 
 #============================================================
 # PSD for different OSR
@@ -399,7 +401,7 @@ if plot_sinewave_pdm_psd_different_osr:
 
     plt.tight_layout()
     plt.savefig("sinewave_pdm_psd_different_osr.svg")
-    plt.savefig(BLOG_PATH + "sinewave_pdm_psd_different_osr.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "sinewave_pdm_psd_different_osr.svg")
 
 #============================================================
 # Noise increase for different orders
@@ -415,5 +417,5 @@ if plot_noise_slope_different_orders:
 
     plt.tight_layout()
     plt.savefig("noise_slope_different_orders.svg")
-    plt.savefig(BLOG_PATH + "noise_slope_different_orders.svg")
+    if save_blog: plt.savefig(BLOG_PATH + "noise_slope_different_orders.svg")
 

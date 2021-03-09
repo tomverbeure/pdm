@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 from scipy import signal
 from filter_lib import *
 
+save_blog = False
 
 import platform
 if platform.system() == "Darwin":
@@ -129,7 +130,7 @@ if True:
 
     plt_name = "moving_average_filter_overview_linear.svg"
     plt.savefig(plt_name)
-    plt.savefig(BLOG_PATH + plt_name)
+    if save_blog: plt.savefig(BLOG_PATH + plt_name)
 
 #============================================================
 # Moving Average Filter - dB
@@ -178,7 +179,7 @@ if True:
 
     plt_name = "moving_average_filter_overview.svg"
     plt.savefig(plt_name)
-    plt.savefig(BLOG_PATH + plt_name)
+    if save_blog: plt.savefig(BLOG_PATH + plt_name)
 
 #============================================================
 # Moving Average Filter Passband
@@ -206,7 +207,7 @@ if False:
 
     plt_name = "moving_average_filter_passband.svg"
     plt.savefig(plt_name)
-    plt.savefig(BLOG_PATH + plt_name)
+    if save_blog: plt.savefig(BLOG_PATH + plt_name)
 
 #============================================================
 # 5th order CIC filter with 4x decimation
@@ -234,7 +235,7 @@ if True:
 
     plt_name = "cic_decimation_full_range.svg"
     plt.savefig(plt_name)
-    plt.savefig(BLOG_PATH + plt_name)
+    if save_blog: plt.savefig(BLOG_PATH + plt_name)
 
     plt.figure(figsize=(10,4))
     plt.subplot(111)
@@ -245,7 +246,7 @@ if True:
 
     plt_name = "cic_decimation_aliased.svg"
     plt.savefig(plt_name)
-    plt.savefig(BLOG_PATH + plt_name)
+    if save_blog: plt.savefig(BLOG_PATH + plt_name)
 
     plt.figure(figsize=(10,4))
     plt.subplot(111)
@@ -257,7 +258,7 @@ if True:
 
     plt_name = "cic_decimation_lower_freqs.svg"
     plt.savefig(plt_name)
-    plt.savefig(BLOG_PATH + plt_name)
+    if save_blog: plt.savefig(BLOG_PATH + plt_name)
 
 #============================================================
 # Decimation without filtering
@@ -272,7 +273,7 @@ if True:
     plt.tight_layout()
     plt_name = "decimation_without_filtering-no_decimation.svg"
     plt.savefig(plt_name)
-    plt.savefig(BLOG_PATH + plt_name)
+    if save_blog: plt.savefig(BLOG_PATH + plt_name)
 
     plt.figure(figsize=(10,6))
     plt.subplot(211)
@@ -286,4 +287,4 @@ if True:
     plt.tight_layout()
     plt_name = "decimation_without_filtering-2x_4x_decimation.svg"
     plt.savefig(plt_name)
-    plt.savefig(BLOG_PATH + plt_name)
+    if save_blog: plt.savefig(BLOG_PATH + plt_name)
